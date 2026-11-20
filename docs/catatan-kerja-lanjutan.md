@@ -14,11 +14,35 @@
 - Komponen slot iklan (`AdSlot`) dengan tinggi yang dipesan, lazy load, label "Iklan", jarak aman
   dari tombol unduh, dan tanpa memuat skrip sebelum consent.
 - Cookie/consent notice (tersimpan di perangkat) yang menjadi gerbang pemuatan skrip iklan.
+  Notice dan tautan "Pengaturan cookie" di footer **hanya muncul bila `VITE_ADSENSE_CLIENT` atau
+  `VITE_ANALYTICS_SCRIPT` diisi** saat build (`consentNeeded()` di `src/site/consent.ts`). Selama
+  keduanya kosong, notice disembunyikan dan halaman Privasi/FAQ menyatakan belum ada cookie pihak
+  ketiga. Begitu iklan diaktifkan, notice dan teks lama kembali otomatis tanpa ubah kode.
 - Pelacakan konversi "dokumen berhasil diunduh" lewat hook analitik tanpa dependensi.
 - Kumpulan alat: gabung, pisah, PDF → JPG, JPG → PDF, kompres, putar halaman, watermark,
   isi formulir, dan batch signing.
 - Cross-link "alat lain" setelah unduh untuk menahan sesi.
+- Ekspor tanda tangan tersimpan sebagai PNG transparan (tombol unduh di kartu tanda tangan, di
+  halaman tanda tangan utama dan Tanda Tangan Massal). Berkas `tanda-tangan-N.png` bisa diimpor
+  ulang lewat "Unggah PNG"; keterangan nama/tanggal ikut di gambar.
 - Workflow GitHub Actions untuk build + deploy ke GitHub Pages.
+
+## Perbaikan bug (20 November 2026)
+
+- **Putar PDF:** memilih "Genap" pada PDF 1 halaman dulu memutar semua halaman. Sekarang muncul
+  pesan bahwa tidak ada halaman genap; `rotatePdf` membedakan `pages` kosong dan tidak diisi.
+- **Watermark:** watermark miring dulu bergeser dari tengah (±45 pt ke kiri, ±78 pt ke atas di A4).
+  Posisi kini dihitung dari pusat halaman (`watermarkLayout`), ikut `/Rotate` halaman, dan teks
+  yang terlalu besar dikecilkan agar muat (maks. 90% halaman).
+- **Tanda Tangan Massal:** preset "kanan-bawah" dan "tengah" dulu memakai posisi x tetap sehingga
+  tanda tangan lebar bisa keluar halaman. Posisi kini dihitung dari lebar tanda tangan.
+- **PDF dengan CropBox:** posisi tanda tangan dan watermark dulu dihitung dari MediaBox, padahal
+  pratinjau pdf.js memakai CropBox. Sekarang semuanya memakai irisan CropBox–MediaBox
+  (`visibleBox` di `src/core/geometry.ts`), jadi hasil unduhan sama dengan pratinjau.
+- **SEO:** URL `og:image` tidak lagi diberi garis miring akhir (`og.png/` → 404), `lastmod` di
+  sitemap mengikuti `CONTENT_UPDATED`, dan tag `article:*` dihapus saat pindah ke halaman
+  non-artikel.
+- Tes unit ditambah untuk semua perbaikan di atas (`npm test`).
 
 ## Belum dikerjakan — menunggu VPS / domain / akun
 
@@ -35,8 +59,15 @@
 - [ ] Daftar AdSense, tunggu approval setelah konten terindeks.
 - [ ] Isi `VITE_ADSENSE_CLIENT` (format `ca-pub-xxxxxxxx`) dan `VITE_ADSENSE_SLOT_*` di environment
       build. Tanpa nilai ini slot hanya menampilkan ruang kosong berlabel, tidak error.
-- [ ] Ganti isi `public/ads.txt` dengan baris publisher resmi dari AdSense
-      (`google.com, pub-xxxxxxxx, DIRECT, f08c47fec0942fa0`).
+- [ ] `ads.txt` dibuat otomatis saat build dari `VITE_ADSENSE_CLIENT`
+      (`google.com, pub-xxxxxxxx, DIRECT, f08c47fec0942fa0`), tidak perlu file di `public/`.
+- [ ] **Bila tetap memakai `ilyasistiqama.github.io/pdfkit-id`:** `ads.txt` hasil build ada di
+      `/pdfkit-id/ads.txt`, sedangkan AdSense membacanya di akar domain
+      (`https://ilyasistiqama.github.io/ads.txt`). Buat repo terpisah `ilyasistiqama.github.io`,
+      aktifkan Pages, dan taruh `ads.txt` di akarnya. Dengan domain sendiri (`BASE_PATH=/`) masalah
+      ini hilang, dan peluang approval AdSense juga lebih baik daripada subdomain `github.io`.
+- [ ] Setelah `VITE_ADSENSE_CLIENT` diisi, pastikan notice "Iklan memakai cookie" muncul lagi di
+      kunjungan pertama dan skrip AdSense baru dimuat setelah "Setuju".
 - [ ] Siapkan jaringan iklan cadangan (mis. Ezoic/Mediavine sesuai syarat trafik) agar suspend
       AdSense tidak berarti pendapatan nol.
 

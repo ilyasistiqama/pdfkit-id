@@ -5,6 +5,7 @@ import type { SignatureImage } from '../../core/image'
 import type { Signature } from '../../core/types'
 import { SignaturePad } from './SignaturePad'
 import { SignatureUpload } from './SignatureUpload'
+import { SignatureDownload } from './SignatureDownload'
 import { cx, eyebrow } from '../ui'
 
 interface Props {
@@ -170,7 +171,7 @@ export function SignatureStudio({
           </div>
 
           <ul className="mt-2 grid grid-cols-2 gap-2">
-            {signatures.map((signature) => (
+            {signatures.map((signature, index) => (
               <li key={signature.id} className="relative">
                 <button
                   type="button"
@@ -195,6 +196,11 @@ export function SignatureStudio({
                 >
                   <Trash2 className="size-3.5" strokeWidth={1.8} />
                 </button>
+                <SignatureDownload
+                  dataUrl={signature.dataUrl}
+                  number={index + 1}
+                  className="-left-1.5"
+                />
               </li>
             ))}
           </ul>

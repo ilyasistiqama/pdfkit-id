@@ -56,6 +56,11 @@ export function useSeo(input: HeadInput) {
         'article:modified_time',
         input.modifiedTime ?? input.publishedTime ?? CONTENT_UPDATED,
       )
+    } else {
+      // Jangan bawa tanggal artikel ke halaman berikutnya yang bukan artikel.
+      document.head
+        .querySelectorAll('meta[property^="article:"]')
+        .forEach((el) => el.remove())
     }
 
     const scripts: HTMLScriptElement[] = []

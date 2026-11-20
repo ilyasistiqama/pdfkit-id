@@ -11,3 +11,4 @@ export function renderRoute(path: string) {
 }
 
 export { siteRoutes } from './site/routes'
+export { CONTENT_UPDATED } from './site/site'

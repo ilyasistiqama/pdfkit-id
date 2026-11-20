@@ -90,7 +90,9 @@ export function AdSlot({ slot, className }: Props) {
           />
         ) : (
           <p className="px-4 text-center text-[0.7rem] leading-relaxed text-muted/70">
-            Ruang iklan. Tidak ada pelacakan sebelum Anda menyetujui cookie.
+            {active
+              ? 'Ruang iklan. Tidak ada pelacakan sebelum Anda menyetujui cookie.'
+              : 'Ruang iklan.'}
           </p>
         )}
       </div>

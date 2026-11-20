@@ -28,7 +28,7 @@ if (!fs.existsSync(BUNDLE)) {
   process.exit(1)
 }
 
-const { renderRoute, siteRoutes } = await import(pathToFileURL(BUNDLE).href)
+const { renderRoute, siteRoutes, CONTENT_UPDATED } = await import(pathToFileURL(BUNDLE).href)
 
 const template = fs.readFileSync(TEMPLATE, 'utf8')
 
@@ -73,7 +73,7 @@ async function main() {
       .map((route) => {
         const clean = route.path.replace(/\/+$/, '')
         const loc = clean ? `${siteUrl}${clean}/` : `${siteUrl}/`
-        return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>2026-11-20</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>${route.priority.toFixed(1)}</priority>\n  </url>`
+        return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${CONTENT_UPDATED}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>${route.priority.toFixed(1)}</priority>\n  </url>`
       })
       .join('\n')
     const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`

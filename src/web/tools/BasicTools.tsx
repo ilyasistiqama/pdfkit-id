@@ -83,16 +83,20 @@ export function RotateTool() {
 
   const run = async () => {
     if (!file) return
+    const pages: number[] = []
+    for (let index = 0; index < pageCount; index++) {
+      const even = index % 2 === 1
+      if (scope === 'all' || (scope === 'odd' && !even) || (scope === 'even' && even)) pages.push(index)
+    }
+    if (!pages.length) {
+      setError('PDF ini tidak punya halaman genap. Pilih "Semua" atau "Ganjil".')
+      return
+    }
     setBusy(true)
     setError('')
     try {
       const { rotatePdf, baseName } = await import('../../core/pdfOps')
       const bytes = new Uint8Array(await file.arrayBuffer())
-      const pages: number[] = []
-      for (let index = 0; index < pageCount; index++) {
-        const even = index % 2 === 1
-        if (scope === 'all' || (scope === 'odd' && !even) || (scope === 'even' && even)) pages.push(index)
-      }
       const output = await rotatePdf(bytes, angle, { pages })
       downloadBlob(pdfBlob(output), `${baseName(file.name)}-diputar.pdf`)
       trackDownload('putar-pdf')

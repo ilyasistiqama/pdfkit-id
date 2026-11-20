@@ -73,9 +73,18 @@ di komputer dan satu kali di HP sebelum membagikan situs secara luas.
 - [ ] PNG tanda tangan dapat diunggah.
 - [ ] Tanda tangan dapat ditempel, digeser, diubah ukurannya, dan diputar.
 - [ ] Undo dan redo berfungsi.
+- [ ] Tombol unduh di kartu tanda tangan tersimpan menghasilkan PNG transparan, dan PNG itu
+      bisa diimpor ulang lewat "Unggah PNG" (cek juga di iPhone/Safari).
 - [ ] PDF hasil unduhan dapat dibuka dan posisi tanda tangannya sesuai tampilan.
 - [ ] Alat gabung PDF menghasilkan dokumen dengan urutan halaman yang benar.
 - [ ] Alat pisah dan kompres PDF menghasilkan file yang dapat dibuka.
+- [ ] Putar PDF: pilihan "Genap" pada PDF 1 halaman menampilkan pesan, bukan memutar halaman.
+- [ ] Watermark miring tampil tepat di tengah halaman, termasuk pada halaman landscape/diputar.
+- [ ] Tanda Tangan Massal: preset kanan-bawah dan tengah dengan lebar 60% tetap di dalam halaman.
+- [ ] PDF hasil scan atau yang pernah di-crop: posisi tanda tangan di hasil unduhan sama dengan
+      pratinjau.
+- [ ] Selama iklan belum aktif, notice "Iklan memakai cookie" dan tautan "Pengaturan cookie" tidak
+      muncul.
 - [ ] Menu, footer, dan tautan pembuat berfungsi pada layar kecil.
 - [ ] Halaman alat dapat dibuka melalui URL langsung, lalu di-refresh tanpa error.
 
@@ -194,6 +203,32 @@ Untuk AdSense, ikuti alur penambahan dan verifikasi situs pada akunmu. Persetuju
 tetap ditentukan Google melalui peninjauan situs. Tidak ada jaminan diterima hanya
 karena fitur dan halaman pendukung sudah tersedia.
 Sumber: [menghubungkan situs ke AdSense](https://support.google.com/adsense/answer/7584263).
+
+### Iklan di alamat github.io
+
+Iklan bisa dipasang walau situs masih di `https://ilyasistiqama.github.io/pdfkit-id/`,
+dengan dua catatan:
+
+- **`ads.txt` harus di akar domain.** Build menaruhnya di `/pdfkit-id/ads.txt`, sedangkan
+  AdSense membaca `https://ilyasistiqama.github.io/ads.txt`. Buat repo
+  `ilyasistiqama.github.io`, aktifkan Pages, lalu taruh `ads.txt` (satu baris dari AdSense)
+  di akar repo tersebut.
+- **Approval lebih sulit** untuk subdomain hosting gratis. Situs didaftarkan sebagai
+  `ilyasistiqama.github.io`. Domain sendiri (sekitar Rp150–250 ribu/tahun) tetap disarankan:
+  arahkan ke GitHub Pages, set `BASE_PATH=/` dan `VITE_SITE_URL=https://domainmu`, maka
+  `ads.txt` otomatis berada di akar domain.
+
+Sumber: [ads.txt untuk AdSense](https://support.google.com/adsense/answer/9785052).
+
+### Notice cookie
+
+Notice "Iklan memakai cookie" sedang disembunyikan karena belum ada iklan atau analitik
+yang aktif. Notice, tautan "Pengaturan cookie", dan teks cookie di halaman Privasi/FAQ
+muncul kembali otomatis begitu `VITE_ADSENSE_CLIENT` atau `VITE_ANALYTICS_SCRIPT` diisi.
+Jangan menghapus komponennya: persetujuan ini dibutuhkan saat iklan berjalan
+(UU PDP 27/2022, dan wajib untuk pengunjung EEA/UK).
+
+### Konfigurasi AdSense
 
 Konfigurasi proyek telah menyiapkan `VITE_ADSENSE_CLIENT` dan
 `VITE_ADSENSE_SLOT_*`, tetapi penyiapan akun, verifikasi kepemilikan, dan persetujuan

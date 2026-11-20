@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from '../../router'
 import { CONTACT_EMAIL, SITE_NAME } from '../../site/site'
+import { consentNeeded } from '../../site/consent'
 import { eyebrow } from '../ui'
 
 export function Page({ title, lede, children }: { title: string; lede: string; children: ReactNode }) {
@@ -79,7 +80,11 @@ export function PrivacyPage() {
   return (
     <Page
       title="Kebijakan Privasi"
-      lede="Ringkasnya: isi dokumen Anda tidak pernah dikirim ke server. Yang diproses pihak ketiga hanya iklan dan statistik kunjungan, dan itu pun setelah Anda menyetujui cookie."
+      lede={
+        consentNeeded()
+          ? 'Ringkasnya: isi dokumen Anda tidak pernah dikirim ke server. Yang diproses pihak ketiga hanya iklan dan statistik kunjungan, dan itu pun setelah Anda menyetujui cookie.'
+          : 'Ringkasnya: isi dokumen Anda tidak pernah dikirim ke server. Saat ini situs tidak memuat iklan, analitik, atau cookie pihak ketiga.'
+      }
     >
       <p className="text-[0.78rem] text-muted">Terakhir diperbarui: 20 November 2026</p>
 
@@ -93,13 +98,22 @@ export function PrivacyPage() {
       <H2>2. Yang disimpan di perangkat</H2>
       <UL>
         <li>Gambar tanda tangan tersimpan di <em>localStorage</em> agar tidak perlu digambar ulang. Tombol “Tersimpan” bisa dimatikan, dan data langsung dihapus saat dimatikan.</li>
-        <li>Pilihan persetujuan cookie disimpan agar Anda tidak ditanya berulang.</li>
+        {consentNeeded() && (
+          <li>Pilihan persetujuan cookie disimpan agar Anda tidak ditanya berulang.</li>
+        )}
         <li>Tidak ada data dokumen yang disimpan di penyimpanan perangkat.</li>
       </UL>
 
       <H2>3. Iklan dan cookie pihak ketiga</H2>
+      {!consentNeeded() && (
+        <P>
+          <strong>Saat ini belum ada iklan atau analitik yang aktif</strong>, sehingga tidak ada
+          cookie pihak ketiga. Bila iklan diaktifkan nanti, notice persetujuan akan muncul lebih
+          dulu dan ketentuan di bawah ini berlaku.
+        </P>
+      )}
       <P>
-        Situs ini gratis dan dibiayai iklan. Setelah Anda menyetujui, penyedia iklan (misalnya Google
+        Situs ini gratis dan direncanakan dibiayai iklan. Setelah Anda menyetujui, penyedia iklan (misalnya Google
         AdSense) dapat memakai cookie dan pengenal untuk menampilkan serta mengukur iklan. Penyedia
         iklan dapat memproses data seperti perkiraan lokasi, jenis perangkat, dan halaman yang
         dikunjungi — <strong>tidak termasuk isi dokumen Anda</strong>, karena dokumen tidak pernah
@@ -107,7 +121,9 @@ export function PrivacyPage() {
       </P>
       <UL>
         <li>Anda bisa menolak lewat notice cookie; situs tetap berfungsi penuh tanpa iklan personal.</li>
-        <li>Pengaturan bisa diubah kapan saja lewat tautan “Pengaturan cookie” di bagian bawah halaman.</li>
+        {consentNeeded() && (
+          <li>Pengaturan bisa diubah kapan saja lewat tautan “Pengaturan cookie” di bagian bawah halaman.</li>
+        )}
         <li>Menonaktifkan personalisasi iklan Google: kunjungi pengaturan iklan akun Google Anda.</li>
       </UL>
 
@@ -122,8 +138,9 @@ export function PrivacyPage() {
       <P>
         Untuk pengunjung Indonesia, pemrosesan data oleh pihak ketiga mengacu pada UU No. 27 Tahun
         2022 tentang Pelindungan Data Pribadi. Anda berhak mengetahui, mengubah, dan menarik
-        persetujuan. Menarik persetujuan cookie cukup dilakukan lewat “Pengaturan cookie”. Untuk
-        permintaan lain, hubungi{' '}
+        persetujuan.{' '}
+        {consentNeeded() && 'Menarik persetujuan cookie cukup dilakukan lewat “Pengaturan cookie”. '}
+        Untuk permintaan lain, hubungi{' '}
         <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-gold hover:underline">
           {CONTACT_EMAIL}
         </a>
@@ -241,7 +258,9 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Apakah situs ini memakai cookie?',
-    a: 'Isi dokumen tidak. Cookie hanya dipakai iklan dan analitik pihak ketiga, dan itu pun setelah Anda memberi izin lewat notice yang muncul.',
+    a: consentNeeded()
+      ? 'Isi dokumen tidak. Cookie hanya dipakai iklan dan analitik pihak ketiga, dan itu pun setelah Anda memberi izin lewat notice yang muncul.'
+      : 'Tidak. Saat ini situs tidak memuat iklan, analitik, atau cookie pihak ketiga. Bila iklan diaktifkan nanti, notice persetujuan akan muncul lebih dulu.',
   },
 ]
 

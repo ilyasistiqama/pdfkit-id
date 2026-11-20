@@ -1,6 +1,7 @@
 import { Link } from '../../router'
 import { ARTICLES, STATIC_PAGES, TOOLS } from '../../site/routes'
 import { SITE_NAME } from '../../site/site'
+import { consentNeeded } from '../../site/consent'
 
 const year = new Date().getFullYear()
 
@@ -78,17 +79,19 @@ export function SiteFooter() {
                   </Link>
                 </li>
               ))}
-              <li>
-                <button
-                  type="button"
-                  onClick={() =>
-                    window.dispatchEvent(new CustomEvent('ttd:open-cookie-settings'))
-                  }
-                  className="text-[0.82rem] text-ink-soft hover:text-ink hover:underline"
-                >
-                  Pengaturan cookie
-                </button>
-              </li>
+              {consentNeeded() && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      window.dispatchEvent(new CustomEvent('ttd:open-cookie-settings'))
+                    }
+                    className="text-[0.82rem] text-ink-soft hover:text-ink hover:underline"
+                  >
+                    Pengaturan cookie
+                  </button>
+                </li>
+              )}
             </ul>
           </nav>
         </div>

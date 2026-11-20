@@ -10,7 +10,7 @@ import {
   rgb,
   type PDFPage,
 } from 'pdf-lib'
-import { normalizeRotation } from './geometry'
+import { normalizeRotation, visibleBox, visualSize, type Box } from './geometry'
 
 export type NamedBytes = { name: string; bytes: Uint8Array }
 
@@ -93,15 +93,21 @@ export async function splitPdf(
   return outputs
 }
 
-/** Derajat putar searah jarum jam: 90, 180, 270 (atau -90). */
+/**
+ * Derajat putar searah jarum jam: 90, 180, 270 (atau -90).
+ * `pages` (indeks 0-based) tidak diisi = semua halaman; array kosong = tidak ada.
+ */
 export async function rotatePdf(
   bytes: Uint8Array,
   delta: number,
   options: { pages?: number[]; title?: string } = {},
 ): Promise<Uint8Array> {
+  if (options.pages && !options.pages.length) {
+    throw new Error('Tidak ada halaman yang cocok untuk diputar.')
+  }
   const doc = await PDFDocument.load(bytes, { updateMetadata: false })
   const pages = doc.getPages()
-  const target = options.pages?.length ? new Set(options.pages) : null
+  const target = options.pages ? new Set(options.pages) : null
   pages.forEach((page: PDFPage, index) => {
     if (target && !target.has(index)) return
     const current = page.getRotation().angle
@@ -124,6 +130,45 @@ const COLORS = {
   biru: rgb(0.18, 0.3, 0.6),
 }
 
+/**
+ * Posisi teks watermark agar pusatnya tepat di tengah area halaman yang tampil.
+ * pdf-lib memutar teks dari titik kiri-bawahnya (baseline), jadi titik awal
+ * dihitung mundur dari pusat. `tilt` adalah kemiringan yang terlihat (berlawanan
+ * jarum jam); `/Rotate` halaman ikut dihitung agar teks tampil tegak/miring
+ * dengan benar di penampil. Teks dikecilkan bila tidak muat (maks. 90% halaman).
+ */
+export function watermarkLayout(input: {
+  area: Box
+  rotation: number
+  tilt: number
+  size: number
+  /** lebar teks pada ukuran 1 pt */
+  unitWidth: number
+  /** tinggi huruf (tanpa descender) pada ukuran 1 pt */
+  unitHeight: number
+}) {
+  const { area, tilt, unitWidth, unitHeight } = input
+  const rotation = normalizeRotation(input.rotation)
+  const vis = visualSize(area.width, area.height, rotation)
+  const t = (tilt * Math.PI) / 180
+  const boxW = unitWidth * Math.abs(Math.cos(t)) + unitHeight * Math.abs(Math.sin(t))
+  const boxH = unitWidth * Math.abs(Math.sin(t)) + unitHeight * Math.abs(Math.cos(t))
+  const size = Math.min(input.size, (vis.w * 0.9) / boxW, (vis.h * 0.9) / boxH)
+
+  const angle = rotation + tilt
+  const a = (angle * Math.PI) / 180
+  const halfW = (unitWidth * size) / 2
+  const halfH = (unitHeight * size) / 2
+  const cx = area.x + area.width / 2
+  const cy = area.y + area.height / 2
+  return {
+    x: cx - halfW * Math.cos(a) + halfH * Math.sin(a),
+    y: cy - halfW * Math.sin(a) - halfH * Math.cos(a),
+    size,
+    angle,
+  }
+}
+
 /** Watermark teks di tengah setiap halaman (opsional miring 35°). */
 export async function watermarkPdf(
   bytes: Uint8Array,
@@ -132,27 +177,30 @@ export async function watermarkPdf(
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.load(bytes, { updateMetadata: false })
   const font = await doc.embedFont(StandardFonts.HelveticaBold)
-  const target = pagesWanted?.length ? new Set(pagesWanted) : null
+  const target = pagesWanted ? new Set(pagesWanted) : null
+  const text = options.text.trim() || 'RAHASIA'
+  const unitWidth = font.widthOfTextAtSize(text, 1)
+  const unitHeight = font.heightAtSize(1, { descender: false })
 
   doc.getPages().forEach((page, index) => {
     if (target && !target.has(index)) return
-    const { width, height } = page.getSize()
-    const text = options.text.trim() || 'RAHASIA'
-    const size = Math.max(8, options.fontSize)
-    const textWidth = font.widthOfTextAtSize(text, size)
-    const angle = options.diagonal ? 35 : 0
-    const rad = (angle * Math.PI) / 180
-    const boxW = Math.abs(textWidth * Math.cos(rad)) + Math.abs(size * Math.sin(rad))
-    const boxH = Math.abs(textWidth * Math.sin(rad)) + Math.abs(size * Math.cos(rad))
+    const layout = watermarkLayout({
+      area: visibleBox(page.getCropBox(), page.getMediaBox()),
+      rotation: page.getRotation().angle,
+      tilt: options.diagonal ? 35 : 0,
+      size: Math.max(8, options.fontSize),
+      unitWidth,
+      unitHeight,
+    })
 
     page.drawText(text, {
-      x: (width - boxW) / 2 + (boxW - textWidth) / 2,
-      y: (height - boxH) / 2 + (boxH - size) / 2,
-      size,
+      x: layout.x,
+      y: layout.y,
+      size: layout.size,
       font,
       color: COLORS[options.color],
       opacity: Math.min(1, Math.max(0.05, options.opacity)),
-      rotate: degrees(angle),
+      rotate: degrees(layout.angle),
     })
   })
 
@@ -164,7 +212,7 @@ const isJpeg = (file: File) =>
   /jpe?g$/i.test(file.type) || /\.jpe?g$/i.test(file.name)
 
 export type ImagesToPdfOptions = {
-  /** 'a4' menyamakan halaman, 'auto' mengikuti rasio tiap gambar, 'a4-fit' memuat gambar utuh di A4 */
+  /** 'a4' memuat gambar utuh di halaman A4, 'auto' mengikuti ukuran tiap gambar */
   layout: 'a4' | 'auto'
   margin: number
 }

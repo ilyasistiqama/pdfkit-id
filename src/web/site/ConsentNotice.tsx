@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Cookie } from 'lucide-react'
 import { enableAnalytics } from '../../site/analytics'
 import { loadAdSense } from '../../site/ads'
-import { readConsent, writeConsent, type Consent } from '../../site/consent'
+import { consentNeeded, readConsent, writeConsent, type Consent } from '../../site/consent'
 import { Link } from '../../router'
 import { btnPrimary, cx } from '../ui'
 
@@ -40,6 +40,7 @@ export function ConsentNotice() {
     setOpen(false)
   }
 
+  if (!consentNeeded()) return null
   if (consent === 'unknown') return null
   if (consent && !open) return null
 

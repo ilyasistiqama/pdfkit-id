@@ -3,6 +3,7 @@ import {
   pageToVisual,
   rectToPoints,
   snapMove,
+  visibleBox,
   toPageBox,
   visualSize,
   type SignRect,
@@ -122,5 +123,31 @@ describe('snapMove', () => {
     expect(result.x).toBeCloseTo(0.3)
     expect(result.y).toBeCloseTo(0.25)
     expect(result.guides).toEqual({})
+  })
+})
+
+describe('visibleBox', () => {
+  const media = { x: 0, y: 0, width: 612, height: 792 }
+
+  it('memakai CropBox bila ada di dalam MediaBox', () => {
+    expect(visibleBox({ x: 36, y: 72, width: 500, height: 600 }, media)).toEqual({
+      x: 36,
+      y: 72,
+      width: 500,
+      height: 600,
+    })
+  })
+
+  it('memotong CropBox yang melewati MediaBox, seperti pdf.js', () => {
+    expect(visibleBox({ x: -10, y: 700, width: 100, height: 200 }, media)).toEqual({
+      x: 0,
+      y: 700,
+      width: 90,
+      height: 92,
+    })
+  })
+
+  it('kembali ke MediaBox bila tidak beririsan', () => {
+    expect(visibleBox({ x: 1000, y: 1000, width: 10, height: 10 }, media)).toEqual(media)
   })
 })

@@ -1,5 +1,5 @@
 import { degrees, PDFDocument, type PDFImage } from 'pdf-lib'
-import { rectToPoints, toPageBox, visualSize } from './geometry'
+import { rectToPoints, toPageBox, visibleBox, visualSize } from './geometry'
 import type { Placement, Signature } from './types'
 
 const PRODUCER = 'Tanda Tangan PDF'
@@ -39,18 +39,19 @@ export async function signPdf(
     }
 
     const rotation = page.getRotation().angle
-    const { w, h } = visualSize(page.getWidth(), page.getHeight(), rotation)
+    const area = visibleBox(page.getCropBox(), page.getMediaBox())
+    const { w, h } = visualSize(area.width, area.height, rotation)
     const box = toPageBox(
       rotation,
-      page.getWidth(),
-      page.getHeight(),
+      area.width,
+      area.height,
       rectToPoints(placement.rect, signature.aspect, w, h),
       placement.rect.tilt,
     )
 
     page.drawImage(image, {
-      x: box.x,
-      y: box.y,
+      x: area.x + box.x,
+      y: area.y + box.y,
       width: box.width,
       height: box.height,
       rotate: degrees(box.rotate),

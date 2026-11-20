@@ -4,20 +4,25 @@ import { signPdf } from '../../core/exportPdf'
 import type { Placement, Signature } from '../../core/types'
 import type { SignatureImage } from '../../core/image'
 import { newId } from '../../core/id'
+import { visibleBox, visualSize } from '../../core/geometry'
 import { downloadAll, formatBytes, pdfBlob } from '../../core/download'
 import { loadSignatures } from '../signatureStore'
 import { SignaturePad } from '../components/SignaturePad'
 import { SignatureUpload } from '../components/SignatureUpload'
+import { SignatureDownload } from '../components/SignatureDownload'
 import { ActionButton, DropZone, Field, FileList, Status, ToolBody, inputClass } from './ToolUi'
 import { cx, eyebrow } from '../ui'
 
 type Preset = 'kiri-bawah' | 'kanan-bawah' | 'tengah' | 'kiri-atas'
 
-const PRESETS: Record<Preset, { x: number; yAnchor: 'top' | 'bottom' }> = {
-  'kiri-bawah': { x: 0.06, yAnchor: 'bottom' },
-  'kanan-bawah': { x: 0.66, yAnchor: 'bottom' },
-  tengah: { x: 0.36, yAnchor: 'bottom' },
-  'kiri-atas': { x: 0.06, yAnchor: 'top' },
+const MARGIN = 0.06
+
+/** Posisi x dihitung dari lebar agar tanda tangan tidak keluar dari halaman. */
+const PRESETS: Record<Preset, { x: (w: number) => number; yAnchor: 'top' | 'bottom' }> = {
+  'kiri-bawah': { x: () => MARGIN, yAnchor: 'bottom' },
+  'kanan-bawah': { x: (w) => 1 - MARGIN - w, yAnchor: 'bottom' },
+  tengah: { x: (w) => (1 - w) / 2, yAnchor: 'bottom' },
+  'kiri-atas': { x: () => MARGIN, yAnchor: 'top' },
 }
 
 export function BatchSignTool() {
@@ -124,8 +129,8 @@ export function BatchSignTool() {
         {tab === 'simpan' ? (
           signatures.length ? (
             <ul className="grid grid-cols-3 gap-2">
-              {signatures.map((signature) => (
-                <li key={signature.id}>
+              {signatures.map((signature, index) => (
+                <li key={signature.id} className="relative">
                   <button
                     type="button"
                     onClick={() => setSelectedId(signature.id)}
@@ -137,6 +142,11 @@ export function BatchSignTool() {
                   >
                     <img src={signature.dataUrl} alt="Tanda tangan" className="max-h-full max-w-full" />
                   </button>
+                  <SignatureDownload
+                    dataUrl={signature.dataUrl}
+                    number={index + 1}
+                    className="-right-1.5"
+                  />
                 </li>
               ))}
             </ul>
@@ -248,15 +258,12 @@ function placementRect(
   pageIndex: number,
 ) {
   const page = doc.getPages()[pageIndex]
-  const { width: pw, height: ph } = page.getSize()
-  const rotation = page.getRotation().angle
-  const swapped = rotation % 180 !== 0
-  const visW = swapped ? ph : pw
-  const visH = swapped ? pw : ph
+  const area = visibleBox(page.getCropBox(), page.getMediaBox())
+  const { w: visW, h: visH } = visualSize(area.width, area.height, page.getRotation().angle)
   const height = (widthFraction * visW) / aspect / visH
   const config = PRESETS[preset]
   return {
-    x: config.x,
+    x: Math.max(0, config.x(widthFraction)),
     y: config.yAnchor === 'bottom' ? Math.max(0.03, 0.9 - height) : 0.07,
     w: widthFraction,
     tilt: 0,

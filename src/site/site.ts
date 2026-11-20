@@ -18,12 +18,21 @@ export const href = (path: string) => {
   return clean ? `${BASE_PATH}${clean}/` : `${BASE_PATH}/`
 }
 
-/** URL absolut untuk canonical/OG, dengan garis miring akhir seperti URL yang disajikan. */
-export const absolute = (path: string) => {
-  if (!SITE_URL) return ''
+/** Path berakhiran ekstensi (og.png, sitemap.xml) adalah file, bukan folder rute. */
+const isFile = (path: string) => /\.[a-z0-9]+$/i.test(path)
+
+/**
+ * URL absolut untuk canonical/OG. Rute diberi garis miring akhir seperti URL yang
+ * disajikan; file (mis. /og.png) tidak, karena "og.png/" menghasilkan 404.
+ */
+export const absoluteUrl = (siteUrl: string, path: string) => {
+  if (!siteUrl) return ''
   const clean = path.replace(/\/+$/, '')
-  return clean ? `${SITE_URL}${clean}/` : `${SITE_URL}/`
+  if (!clean) return `${siteUrl}/`
+  return isFile(clean) ? `${siteUrl}${clean}` : `${siteUrl}${clean}/`
 }
+
+export const absolute = (path: string) => absoluteUrl(SITE_URL, path)
 
 export const CONTACT_EMAIL = 'ilyasistiqama@gmail.com'
 

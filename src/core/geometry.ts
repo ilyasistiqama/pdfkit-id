@@ -30,6 +30,22 @@ export type Rotation = 0 | 90 | 180 | 270
 export const normalizeRotation = (rotation: number): Rotation =>
   ((((Math.round(rotation / 90) * 90) % 360) + 360) % 360) as Rotation
 
+export type Box = { x: number; y: number; width: number; height: number }
+
+/**
+ * Area halaman yang benar-benar tampil: irisan CropBox dan MediaBox, sama
+ * seperti pdf.js. Posisi tanda tangan/watermark dihitung dari area ini,
+ * bukan dari MediaBox, agar hasil unduhan sama dengan pratinjau.
+ */
+export function visibleBox(crop: Box, media: Box): Box {
+  const x1 = Math.max(Math.min(crop.x, crop.x + crop.width), Math.min(media.x, media.x + media.width))
+  const y1 = Math.max(Math.min(crop.y, crop.y + crop.height), Math.min(media.y, media.y + media.height))
+  const x2 = Math.min(Math.max(crop.x, crop.x + crop.width), Math.max(media.x, media.x + media.width))
+  const y2 = Math.min(Math.max(crop.y, crop.y + crop.height), Math.max(media.y, media.y + media.height))
+  if (x2 - x1 <= 0 || y2 - y1 <= 0) return media
+  return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 }
+}
+
 /** Ukuran halaman seperti yang tampil (lebar/tinggi tertukar untuk rotasi 90/270). */
 export function visualSize(pageWidth: number, pageHeight: number, rotation: number) {
   const r = normalizeRotation(rotation)
