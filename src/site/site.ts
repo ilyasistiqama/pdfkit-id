@@ -25,7 +25,7 @@ export const absolute = (path: string) => {
   return clean ? `${SITE_URL}${clean}/` : `${SITE_URL}/`
 }
 
-export const CONTACT_EMAIL = 'halo@ttdpdf.id'
+export const CONTACT_EMAIL = 'ilyasistiqama@gmail.com'
 
 /** Tanggal terakhir konten situs diperbarui (dipakai sitemap). */
 export const CONTENT_UPDATED = '2026-11-20'
