@@ -1,0 +1,125 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/fraunces';
+
+/*
+ * Palet: kertas gading hangat, tinta gelap, aksen emas tua.
+ * Ikut mode gelap perangkat secara otomatis.
+ */
+:root {
+  color-scheme: light;
+  --bg: #f5f2ec;
+  --surface: #fffdf9;
+  --sunken: #efebe3;
+  --ink: #1b1915;
+  --ink-soft: #3a362f;
+  --muted: #8b8478;
+  --line: #e6e0d5;
+  --gold: #9c7a45;
+  --gold-soft: #f3ecdf;
+  --on-ink: #f7f3ea;
+  --ok: #2f6b4f;
+  --loss: #a23b2e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #11100e;
+    --surface: #1a1916;
+    --sunken: #141310;
+    --ink: #f2ede4;
+    --ink-soft: #d9d3c8;
+    --muted: #8f887c;
+    --line: #2b2925;
+    --gold: #d4b483;
+    --gold-soft: #2a2419;
+    --on-ink: #11100e;
+    --ok: #7fbf9c;
+    --loss: #e08b7d;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-on-ink: var(--on-ink);
+  --color-ok: var(--ok);
+  --color-loss: var(--loss);
+
+  --font-sans: 'Inter Variable', system-ui, sans-serif;
+  --font-serif: 'Fraunces Variable', Georgia, serif;
+
+  --animate-fade: fade 0.2s ease-out;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes overlay {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes sheet {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@layer base {
+  html {
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-bg font-sans text-ink antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  button {
+    cursor: pointer;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-gold;
+  }
+  ::selection {
+    @apply bg-gold-soft;
+  }
+}
+
+/* Latar kotak-kotak untuk melihat area transparan pada PNG */
+@utility checker {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #ece7de 25%, transparent 25%),
+    linear-gradient(-45deg, #ece7de 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ece7de 75%),
+    linear-gradient(-45deg, transparent 75%, #ece7de 75%);
+  background-size: 12px 12px;
+  background-position:
+    0 0,
+    0 6px,
+    6px -6px,
+    -6px 0;
+}
