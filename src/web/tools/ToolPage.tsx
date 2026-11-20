@@ -1,0 +1,118 @@
+import type { ToolMeta } from '../../site/routes'
+import { Link } from '../../router'
+import { AdSlot } from '../site/AdSlot'
+import { eyebrow } from '../ui'
+
+const STEPS: Record<string, string[]> = {
+  'gabung-pdf': [
+    'Pilih dua berkas PDF atau lebih.',
+    'Atur urutan dengan tombol panah pada daftar.',
+    'Tekan “Gabung” untuk mengunduh satu PDF hasil gabungan.',
+  ],
+  'pisah-pdf': [
+    'Pilih PDF yang ingin dipisah.',
+    'Tentukan rentang halaman (mis. 1-3, 5) atau pilih pecah tiap halaman.',
+    'Unduh satu berkas, atau semua berkas sekaligus.',
+  ],
+  'pdf-ke-jpg': [
+    'Pilih PDF.',
+    'Tentukan format gambar dan resolusinya.',
+    'Unduh semua gambar yang dihasilkan.',
+  ],
+  'jpg-ke-pdf': [
+    'Pilih beberapa gambar JPG atau PNG.',
+    'Atur urutan dan ukuran halaman.',
+    'Tekan “Buat PDF” lalu unduh hasilnya.',
+  ],
+  'kompres-pdf': [
+    'Pilih PDF yang ukurannya terlalu besar.',
+    'Pilih tingkat kompresi.',
+    'Bandingkan ukuran sebelum dan sesudah, lalu unduh.',
+  ],
+  'putar-pdf': [
+    'Pilih PDF.',
+    'Tentukan sudut putar dan halaman yang ingin diputar.',
+    'Unduh PDF dengan arah halaman yang sudah diperbaiki.',
+  ],
+  'watermark-pdf': [
+    'Pilih PDF.',
+    'Isi teks watermark, warna, ukuran, dan transparansi.',
+    'Unduh PDF yang sudah diberi watermark.',
+  ],
+  'isi-formulir-pdf': [
+    'Pilih PDF yang memiliki kolom formulir.',
+    'Isi kolom teks, centang, dan pilihan yang tersedia.',
+    'Simpan lalu unduh PDF yang sudah terisi.',
+  ],
+  'tanda-tangan-massal': [
+    'Pilih beberapa PDF sekaligus.',
+    'Pilih tanda tangan tersimpan dan atur posisinya.',
+    'Unduh semua dokumen yang sudah ditandatangani.',
+  ],
+}
+
+/** Kop halaman alat dirender statis agar isinya terbaca mesin pencari. */
+export function ToolIntro({ tool }: { tool: ToolMeta }) {
+  const steps = STEPS[tool.slug] ?? []
+
+  return (
+    <div className="mx-auto w-full max-w-4xl px-5 pt-10">
+      <p className={eyebrow}>Alat PDF</p>
+      <h1 className="mt-2 font-serif text-3xl leading-tight tracking-tight sm:text-4xl">
+        {tool.name}
+      </h1>
+      <p className="mt-3 max-w-2xl text-[0.95rem] leading-relaxed text-ink-soft">{tool.description}</p>
+
+      <ol className="mt-5 grid gap-2 sm:grid-cols-3">
+        {steps.map((step, index) => (
+          <li key={step} className="rounded-2xl bg-surface/70 p-3.5 ring-1 ring-line/70">
+            <p className="text-[0.66rem] font-semibold tracking-[0.14em] text-muted uppercase">
+              Langkah {index + 1}
+            </p>
+            <p className="mt-1 text-[0.84rem] leading-relaxed text-ink-soft">{step}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
+/** Penutup halaman: catatan privasi, tautan alat lain, dan slot iklan. */
+export function ToolFooter({ tool }: { tool: ToolMeta }) {
+  return (
+    <div className="mx-auto w-full max-w-4xl px-5 pb-4">
+      <p className="mt-6 rounded-xl bg-sunken px-3 py-2.5 text-[0.75rem] leading-relaxed text-muted">
+        Berkas diproses di perangkat Anda dan tidak diunggah ke server. Menutup tab akan menghapusnya
+        dari memori.
+      </p>
+
+      <AdSlot slot="content" className="mt-8" />
+
+      <section className="mt-8">
+        <p className={eyebrow}>Alat lain</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Link
+            to="/alat"
+            className="rounded-full bg-surface px-3 py-1.5 text-[0.8rem] font-medium text-ink-soft ring-1 ring-line hover:ring-gold/60"
+          >
+            Semua alat PDF
+          </Link>
+          {tool.slug !== 'tanda-tangan-massal' && (
+            <Link
+              to="/alat/tanda-tangan-massal"
+              className="rounded-full bg-surface px-3 py-1.5 text-[0.8rem] font-medium text-ink-soft ring-1 ring-line hover:ring-gold/60"
+            >
+              Tanda tangan massal
+            </Link>
+          )}
+          <Link
+            to="/"
+            className="rounded-full bg-surface px-3 py-1.5 text-[0.8rem] font-medium text-ink-soft ring-1 ring-line hover:ring-gold/60"
+          >
+            Tanda tangani PDF
+          </Link>
+        </div>
+      </section>
+    </div>
+  )
+}
