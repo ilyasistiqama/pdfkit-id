@@ -1,0 +1,67 @@
+name: Deploy ke GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Build
+        env:
+          # Untuk project page (username.github.io/repo) biarkan BEGIN_PAGES_BASE
+          # mengambil nama repo otomatis. Untuk custom domain, set BASE_PATH=/
+          # dan VITE_SITE_URL=https://domain-anda.
+          BASE_PATH: ${{ vars.BASE_PATH || format('/{0}/', github.event.repository.name) }}
+          VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
+          VITE_ADSENSE_CLIENT: ${{ vars.VITE_ADSENSE_CLIENT }}
+          VITE_ADSENSE_SLOT_CONTENT: ${{ vars.VITE_ADSENSE_SLOT_CONTENT }}
+          VITE_ADSENSE_SLOT_SIDEBAR: ${{ vars.VITE_ADSENSE_SLOT_SIDEBAR }}
+          VITE_ADSENSE_SLOT_ANCHOR: ${{ vars.VITE_ADSENSE_SLOT_ANCHOR }}
+          VITE_ANALYTICS_SCRIPT: ${{ vars.VITE_ANALYTICS_SCRIPT }}
+          VITE_ANALYTICS_DOMAIN: ${{ vars.VITE_ANALYTICS_DOMAIN }}
+        run: npm run build
+
+      - name: Cek hasil prerender
+        run: |
+          test -f dist/index.html
+          test -f dist/404.html
+          test -f dist/robots.txt
+          grep -q '<title>' dist/alat/gabung-pdf/index.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

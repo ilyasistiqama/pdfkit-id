@@ -3,7 +3,9 @@
     "allow": [
       "Shell(node -v)",
       "Shell(npm:*)",
-      "Shell(git:*)"
+      "Shell(git:*)",
+      "Shell(cd /var/www/apps/freelance/ttd-pdf && git reset -q && git add src/router.tsx src/site src/prerender.tsx scripts/prerender.mjs vite.prerender.config.ts vite.config.ts index.html src/main.tsx package.json .gitignore public/og.png src/App.tsx src/web/sign/SignWorkspace.tsx src/web/site src/web/components/Landing.tsx src/web/components/Workspace.tsx src/site/site.test.ts src/core/pdfOps.test.ts 2>/dev/null; git status --short | head -40)",
+      "Shell(cd:*)"
     ],
     "deny": [],
     "defaultMode": "default"
