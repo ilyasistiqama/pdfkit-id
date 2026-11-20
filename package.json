@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build && vite build --config vite.prerender.config.ts && node scripts/prerender.mjs",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:dev": "node scripts/check-dev.mjs",
     "test:e2e": "node scripts/e2e.mjs"
   },
   "dependencies": {

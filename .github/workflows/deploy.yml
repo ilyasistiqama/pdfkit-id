@@ -27,14 +27,15 @@ jobs:
 
       - run: npm ci
       - run: npm test
+      - run: npm run test:dev
 
       - name: Build
         env:
-          # Untuk project page (username.github.io/repo) biarkan BEGIN_PAGES_BASE
-          # mengambil nama repo otomatis. Untuk custom domain, set BASE_PATH=/
+          # BASE_PATH mengambil nama repo otomatis untuk GitHub Pages.
+          # Untuk custom domain, set BASE_PATH=/
           # dan VITE_SITE_URL=https://domain-anda.
           BASE_PATH: ${{ vars.BASE_PATH || format('/{0}/', github.event.repository.name) }}
-          VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
+          VITE_SITE_URL: ${{ vars.VITE_SITE_URL || 'https://ilyasistiqama.github.io/pdfkit-id' }}
           VITE_ADSENSE_CLIENT: ${{ vars.VITE_ADSENSE_CLIENT }}
           VITE_ADSENSE_SLOT_CONTENT: ${{ vars.VITE_ADSENSE_SLOT_CONTENT }}
           VITE_ADSENSE_SLOT_SIDEBAR: ${{ vars.VITE_ADSENSE_SLOT_SIDEBAR }}
@@ -48,6 +49,8 @@ jobs:
           test -f dist/index.html
           test -f dist/404.html
           test -f dist/robots.txt
+          test -f dist/sitemap.xml
+          grep -q 'rel="canonical"' dist/index.html
           grep -q '<title>' dist/alat/gabung-pdf/index.html
 
       - uses: actions/configure-pages@v5

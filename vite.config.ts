@@ -9,9 +9,11 @@ import { VitePWA } from 'vite-plugin-pwa'
 const base = process.env.BASE_PATH ?? '/'
 
 /**
- * Sajikan `<rute>/index.html` untuk permintaan di server dev/preview, sama
+ * Sajikan `<rute>/index.html` untuk permintaan di server preview, sama
  * seperti hosting statis (GitHub Pages). Tanpa ini preview selalu memakai
  * index.html beranda sehingga hidrasi React tidak cocok.
+ * Dev memakai fallback bawaan Vite; modul internal seperti /@vite/client
+ * dan /@react-refresh harus tetap ditangani Vite tanpa penulisan ulang URL.
  */
 function routeFallback(): Plugin {
   const resolveFile = (clean: string) => {
@@ -26,14 +28,6 @@ function routeFallback(): Plugin {
 
   return {
     name: 'ttd-route-fallback',
-    configureServer(server) {
-      server.middlewares.use((req, _res, next) => {
-        const url = req.url?.split('?')[0] ?? '/'
-        const clean = url.startsWith(base) ? url.slice(base.length) : url
-        if (clean && !clean.includes('.')) req.url = resolveFile(`/${clean.replace(/^\/+|\/+$/g, '')}`)
-        next()
-      })
-    },
     configurePreviewServer(server) {
       server.middlewares.use((req, _res, next) => {
         const url = req.url?.split('?')[0] ?? '/'

@@ -5,7 +5,7 @@ signature image, place it on any page, then download a signed copy. There are al
 (merge, split, rotate, watermark, compress, convert, fill forms, batch signing). Nothing about the
 document is uploaded to a server.
 
-**Live app:** _add your deployment URL here_
+**Live app:** https://ilyasistiqama.github.io/pdfkit-id/
 
 ## Features
 
@@ -109,6 +109,8 @@ All optional; the site works without them.
 `.github/workflows/deploy.yml` builds, runs unit tests, verifies the prerendered output, and
 publishes `dist/`. For a project page it derives `BASE_PATH` from the repo name automatically; for a
 custom domain set the repository variables `BASE_PATH=/` and `VITE_SITE_URL=https://your-domain`.
+The workflow defaults `VITE_SITE_URL` to `https://ilyasistiqama.github.io/pdfkit-id`, so canonical
+URLs and the sitemap are generated without configuring repository variables.
 Also enable **Settings → Pages → Source: GitHub Actions**.
 
 ## Tests

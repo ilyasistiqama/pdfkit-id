@@ -94,7 +94,21 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-8 flex flex-col gap-2 border-t border-line/70 pt-5 text-[0.72rem] leading-relaxed text-muted sm:flex-row sm:items-center sm:justify-between">
-          <p>© {year} {SITE_NAME}. Gratis untuk dipakai.</p>
+          <div>
+            <p>© {year} {SITE_NAME}. Gratis untuk dipakai.</p>
+            <p className="mt-1">
+              Dibuat oleh{' '}
+              <a
+                href="https://muis.life/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-sm font-medium text-ink-soft underline-offset-4 transition-colors hover:text-gold hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
+              >
+                Klik di sini
+                <span className="sr-only"> (buka di tab baru)</span>
+              </a>
+            </p>
+          </div>
           <p>
             Tanda tangan elektronik berbentuk gambar, bukan tanda tangan digital tersertifikasi PSrE.
           </p>
