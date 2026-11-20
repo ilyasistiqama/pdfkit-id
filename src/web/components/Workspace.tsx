@@ -20,6 +20,12 @@ import { SignatureStudio } from './SignatureStudio'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Modal } from './Modal'
 import { btnIcon, btnPrimary, card, cx, eyebrow } from '../ui'
+import { href } from '../../site/site'
+import { TOOLS } from '../../site/routes'
+
+const RELATED_TOOLS = TOOLS.filter((tool) =>
+  ['gabung-pdf', 'kompres-pdf', 'pisah-pdf', 'tanda-tangan-massal'].includes(tool.slug),
+)
 
 interface Props {
   doc: PDFDocumentProxy
@@ -172,6 +178,24 @@ export function Workspace(props: Props) {
         <p className="mt-2 text-center text-[0.68rem] leading-relaxed text-muted">
           Diproses di browser kamu. File tidak dikirim ke mana pun.
         </p>
+        <div className="mt-3 border-t border-line pt-2.5">
+          <p className="text-[0.68rem] font-semibold tracking-[0.12em] text-muted uppercase">
+            Alat lain
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {RELATED_TOOLS.map((item) => (
+              <a
+                key={item.slug}
+                href={href(`/alat/${item.slug}`)}
+                target="_blank"
+                rel="noopener"
+                className="rounded-full bg-sunken px-2.5 py-1 text-[0.7rem] font-medium text-ink-soft transition hover:text-ink"
+              >
+                {item.name}
+              </a>
+            ))}
+          </div>
+        </div>
         <p className="mt-3 border-t border-line pt-2.5 text-[0.68rem] leading-relaxed text-muted">
           Pintasan: <span className="font-medium text-ink-soft">panah</span> geser ·{' '}
           <span className="font-medium text-ink-soft">Shift+panah</span> geser cepat ·{' '}

@@ -69,11 +69,6 @@ interface Props {
 export function Landing({ onFile, loading }: Props) {
   return (
     <div className="mx-auto w-full max-w-5xl px-5 pt-8 pb-20 sm:pt-14">
-      <div className="mb-10 flex items-center gap-2.5">
-        <img src="/favicon.svg" alt="" className="size-8 rounded-lg" />
-        <span className="font-serif text-lg tracking-tight">Tanda Tangan PDF</span>
-      </div>
-
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-center">
         <div className="max-w-2xl">
           <p className={eyebrow}>Tanpa server · Tanpa akun</p>
