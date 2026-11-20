@@ -115,6 +115,7 @@ Also enable **Settings → Pages → Source: GitHub Actions**.
 
 ```bash
 npm test                            # unit tests
+npm run test:dev                     # dev routes and Vite bootstrap modules
 npm run build && npm run test:e2e        # signing flow in headless Chrome
 npm run build && node scripts/e2e-tools.mjs   # every PDF tool in headless Chrome
 ```
@@ -178,3 +179,4 @@ docs/
   rencana-monetisasi-iklan.md   monetisation plan
   catatan-kerja-lanjutan.md     what is done vs. what waits for a VPS/domain
 ```
+# pdfkit-id
