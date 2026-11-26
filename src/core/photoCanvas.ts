@@ -1,9 +1,7 @@
+import { decodePhotoUrl } from './photoInput'
+
 export async function preparePhotoCanvas(url: string, rotation: number, minLongEdge = 0) {
-  const image = new Image()
-  image.src = url
-  await image.decode().catch(() => {
-    throw new Error('Foto tidak bisa dibuka. Pilih gambar JPG, PNG, atau WebP yang bisa ditampilkan.')
-  })
+  const image = await decodePhotoUrl(url)
 
   const longEdge = Math.max(image.naturalWidth, image.naturalHeight)
   const limit = minLongEdge ? 3200 : 4096

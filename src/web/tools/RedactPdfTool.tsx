@@ -3,6 +3,7 @@ import { downloadBlob, pdfBlob } from '../../core/download'
 import type { Redaction } from '../../core/redactPdf'
 import { trackDownload } from '../../site/analytics'
 import { PdfToolPreview, useToolPdf } from './PdfToolPreview'
+import { confirmSignedPdfChange, SignedPdfNotice } from './SignedPdfNotice'
 import { ActionButton, DropZone, Field, Status, ToolBody, inputClass } from './ToolUi'
 
 type Point = { x: number; y: number }
@@ -52,6 +53,7 @@ export default function RedactPdfTool() {
     setError('')
     setSaved(false)
     try {
+      if (!await confirmSignedPdfChange(selected.file, controller.signal)) return
       const { redactPdf } = await import('../../core/redactPdf')
       const data = await redactPdf(selected.session.doc, areas, controller.signal,
         (page, total) => setProgress(`Menyensor halaman ${page}/${total}…`))
@@ -79,6 +81,7 @@ export default function RedactPdfTool() {
             <button type="button" disabled={busy} className="text-sm text-gold hover:underline"
               onClick={() => { clear(); changePage(1); setAreas({}); setSaved(false); setError('') }}>Ganti PDF</button>
           </div>
+          <SignedPdfNotice source={selected.file} />
           <div className="flex items-end gap-2">
             <div className="max-w-60 flex-1">
               <Field label="Halaman">

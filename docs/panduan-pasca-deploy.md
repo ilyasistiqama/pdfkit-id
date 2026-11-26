@@ -83,7 +83,7 @@ di komputer dan satu kali di HP sebelum membagikan situs secara luas.
 - [ ] Tanda Tangan Massal: preset kanan-bawah dan tengah dengan lebar 60% tetap di dalam halaman.
 - [ ] PDF hasil scan atau yang pernah di-crop: posisi tanda tangan di hasil unduhan sama dengan
       pratinjau.
-- [ ] Selama iklan belum aktif, notice "Iklan memakai cookie" dan tautan "Pengaturan cookie" tidak
+- [ ] Selama iklan belum aktif, panel “Pilihan privasi” dan tautan “Pengaturan privasi” tidak
       muncul.
 - [ ] Menu, footer, dan tautan pembuat berfungsi pada layar kecil.
 - [ ] Halaman alat dapat dibuka melalui URL langsung, lalu di-refresh tanpa error.
@@ -206,32 +206,46 @@ Sumber: [menghubungkan situs ke AdSense](https://support.google.com/adsense/answ
 
 ### Iklan di alamat github.io
 
-Iklan bisa dipasang walau situs masih di `https://ilyasistiqama.github.io/pdfkit-id/`,
-dengan dua catatan:
+Selama PDFKit masih di `https://ilyasistiqama.github.io/pdfkit-id/`, biarkan variabel
+AdSense kosong. `ilyasistiqama.github.io` dipakai bersama oleh beberapa proyek, dan
+AdSense menerima pengajuan untuk alamat `ilyasistiqama.github.io` tanpa path `/pdfkit-id/`.
+`ads.txt` untuk alamat itu juga perlu tersedia di `https://ilyasistiqama.github.io/ads.txt`.
+[Format URL AdSense](https://support.google.com/adsense/answer/2784438) ·
+[Panduan crawling ads.txt](https://support.google.com/adsense/answer/7679060)
 
-- **`ads.txt` harus di akar domain.** Build menaruhnya di `/pdfkit-id/ads.txt`, sedangkan
-  AdSense membaca `https://ilyasistiqama.github.io/ads.txt`. Buat repo
-  `ilyasistiqama.github.io`, aktifkan Pages, lalu taruh `ads.txt` (satu baris dari AdSense)
-  di akar repo tersebut.
-- **Approval lebih sulit** untuk subdomain hosting gratis. Situs didaftarkan sebagai
-  `ilyasistiqama.github.io`. Domain sendiri (sekitar Rp150–250 ribu/tahun) tetap disarankan:
-  arahkan ke GitHub Pages, set `BASE_PATH=/` dan `VITE_SITE_URL=https://domainmu`, maka
-  `ads.txt` otomatis berada di akar domain.
+### AdSense untuk PDFKit di subdomain
 
-Sumber: [ads.txt untuk AdSense](https://support.google.com/adsense/answer/9785052).
+Setelah domain tersedia, gunakan `muis.life` untuk situs profil bebas iklan dan
+`pdfkit.muis.life` untuk PDFKit dengan unit iklan manual.
 
-### Notice cookie
+1. Arahkan `pdfkit.muis.life` ke deployment PDFKit. Di repo PDFKit, set variabel GitHub
+   Actions `BASE_PATH=/` dan `VITE_SITE_URL=https://pdfkit.muis.life`, lalu deploy ulang.
+2. Di **AdSense → Sites → New site**, daftarkan domain utama `muis.life`. Pilih verifikasi
+   **meta tag** dan pasang tag dari AdSense di `<head>` halaman profil `muis.life`. Gunakan
+   tag verifikasi saja di profil. Ajukan peninjauan dan tunggu status **Ready**.
+   [Aturan situs dan subdomain](https://support.google.com/adsense/answer/12170421) ·
+   [Panduan verifikasi dan peninjauan](https://support.google.com/adsense/answer/12169212)
+3. Publikasikan baris `ads.txt` dari AdSense di `https://muis.life/ads.txt`. Build PDFKit
+   dapat menghasilkan file yang sama di `https://pdfkit.muis.life/ads.txt`. Crawler
+   AdSense mulai dari domain utama, jadi pastikan file di `muis.life` dapat diakses publik.
+   [Panduan crawling ads.txt](https://support.google.com/adsense/answer/7679060)
+4. Biarkan **Auto ads** mati. Pasang CMP TCF yang tersertifikasi Google dan mendukung pemasangan skrip mandiri, lalu isi `VITE_ADSENSE_CMP_SCRIPT` dengan URL HTTPS dari penyedia. Setelah situs **Ready**, isi ID publisher dan unit hanya di repo PDFKit. ID saja tidak mengaktifkan iklan. Unit hanya dicoba pada katalog dan panduan setelah persetujuan pengunjung dan sinyal CMP. [Persyaratan CMP Google](https://support.google.com/adsense/answer/13554116)
+5. Verifikasi permintaan jaringan pada kunjungan baru, penolakan, persetujuan, dan pencabutan. Uji juga pembukaan alat dari panduan dan pastikan dokumen dibuka pada halaman baru tanpa skrip iklan.
 
-Notice "Iklan memakai cookie" sedang disembunyikan karena belum ada iklan atau analitik
-yang aktif. Notice, tautan "Pengaturan cookie", dan teks cookie di halaman Privasi/FAQ
-muncul kembali otomatis begitu `VITE_ADSENSE_CLIENT` atau `VITE_ANALYTICS_SCRIPT` diisi.
-Jangan menghapus komponennya: persetujuan ini dibutuhkan saat iklan berjalan
-(UU PDP 27/2022, dan wajib untuk pengunjung EEA/UK).
+### Privasi dan penyimpanan browser
+
+Gambar tanda tangan, preset workflow, dan template bisa dipakai dalam tab berjalan. Untuk mengizinkan penyimpanan antarsesi pada origin HTTPS khusus, set `BASE_PATH=/` dan `VITE_SIGNATURE_STORAGE_ORIGIN` dengan origin tanpa path, misalnya `https://pdfkit.muis.life`. Jangan set variabel ini untuk host yang juga dipakai proyek lain. Penyimpanan gambar tetap harus dipilih pengguna dan penyimpanan data sensitif dibatasi ke tab jika iklan dikonfigurasi. Salinan lama bisa ditinjau dan dihapus lewat halaman Privasi.
+
+Analitik dan iklan punya pilihan terpisah. Uji pengiriman dan pencabutan analitik dengan penyedia pilihan sebelum produksi. Saat izin analitik dicabut, frame terisolasi ditutup tanpa memuat ulang alat.
+
+### Status pendaftaran PSE
+
+Konfirmasikan klasifikasi PDFKit kepada Komdigi berdasarkan bentuk pengelola, layanan publik, dan data yang diproses. Jika klasifikasinya mewajibkan pendaftaran, siapkan data pengelola dan ikuti prosedur OSS sebelum tahap operasional yang relevan. [Kriteria PSE Lingkup Privat](https://pse.komdigi.go.id/panduan/kriteria-pendaftaran-pse-lingkup-privat)
 
 ### Konfigurasi AdSense
 
-Konfigurasi proyek telah menyiapkan `VITE_ADSENSE_CLIENT` dan
-`VITE_ADSENSE_SLOT_*`, tetapi penyiapan akun, verifikasi kepemilikan, dan persetujuan
+Konfigurasi proyek telah menyiapkan `VITE_ADSENSE_CLIENT`, `VITE_ADSENSE_SLOT_*`, dan
+`VITE_ADSENSE_CMP_SCRIPT`, tetapi penyiapan akun, verifikasi kepemilikan, dan persetujuan
 situs tetap perlu diselesaikan. Jangan mengisi ID contoh. Baca juga
 `docs/catatan-kerja-lanjutan.md` untuk pekerjaan yang menunggu akun atau domain.
 

@@ -1,4 +1,5 @@
 import type { Caption } from './types'
+import { decodePhotoUrl, normalizePhotoFile, withPhotoImage } from './photoInput'
 
 const MAX_WIDTH = 900
 const ALPHA_CUTOFF = 12
@@ -105,27 +106,22 @@ export function canvasToSignature(source: HTMLCanvasElement): SignatureImage | n
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(trimmed, 0, 0, width, height)
 
-  return { dataUrl: canvas.toDataURL('image/png'), aspect: width / height }
+  return { dataUrl: canvas.toDataURL('image/png'), aspect: canvas.width / canvas.height }
 }
 
-/** File gambar (PNG/JPG) -> PNG transparan yang sudah dipangkas. */
+/** File foto yang bisa dibaca browser -> PNG tanda tangan. */
 export async function fileToSignature(file: File, dropBackground: boolean) {
-  const bitmap = await createImageBitmap(file)
-  const canvas = createCanvas(bitmap.width, bitmap.height)
-  const ctx = context(canvas)
-  ctx.drawImage(bitmap, 0, 0)
-  bitmap.close()
-
-  if (dropBackground && !hasTransparency(canvas)) removeWhiteBackground(canvas)
-  return canvasToSignature(canvas)
-}
-
-function loadImage(src: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image()
-    image.onload = () => resolve(image)
-    image.onerror = () => reject(new Error('Gambar tidak bisa dibuka.'))
-    image.src = src
+  return withPhotoImage(await normalizePhotoFile(file), (photo) => {
+    const scale = Math.min(1, 4096 / Math.max(photo.naturalWidth, photo.naturalHeight))
+    const canvas = createCanvas(photo.naturalWidth * scale, photo.naturalHeight * scale)
+    try {
+      context(canvas).drawImage(photo, 0, 0, canvas.width, canvas.height)
+      if (dropBackground && !hasTransparency(canvas)) removeWhiteBackground(canvas)
+      return canvasToSignature(canvas)
+    } finally {
+      canvas.width = 0
+      canvas.height = 0
+    }
   })
 }
 
@@ -137,7 +133,7 @@ export async function withCaption(
   signature: SignatureImage,
   caption: Caption,
 ): Promise<SignatureImage> {
-  const image = await loadImage(signature.dataUrl)
+  const image = await decodePhotoUrl(signature.dataUrl)
   const width = image.width
   const padX = Math.round(width * 0.02)
   const nameSize = Math.round(Math.min(44, Math.max(20, width * 0.045)))

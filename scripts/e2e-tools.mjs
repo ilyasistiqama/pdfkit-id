@@ -12,7 +12,7 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
-const { PDFDocument, StandardFonts, degrees, rgb } = require('pdf-lib')
+const { PDFDocument, PDFName, PDFString, StandardFonts, degrees, rgb } = require('pdf-lib')
 
 const PORT = Number(process.env.E2E_PORT ?? 4174)
 const CDP_PORT = Number(process.env.E2E_CDP_PORT ?? 9334)
@@ -25,9 +25,10 @@ const PDF_B = path.join(WORK, 'dua.pdf')
 const FORM = path.join(WORK, 'form.pdf')
 const IMG = path.join(WORK, 'tanda.png')
 const PHOTO = path.join(WORK, 'surat.png')
-const PHOTO_TWO = path.join(WORK, 'lampiran.png')
+const PHOTO_TWO = path.join(WORK, 'lampiran.webp')
 const SCAN = path.join(WORK, 'scan.pdf')
 const PRIVATE_PDF = path.join(WORK, 'pribadi.pdf')
+const CAMERA_JPEG = path.join(WORK, 'kamera.jpg')
 
 const failures = []
 let checks = 0
@@ -37,6 +38,21 @@ const check = (ok, label, detail = '') => {
   if (!ok) failures.push(label)
 }
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+function characterAccuracy(expected, actual) {
+  const normalize = (text) => Array.from(text.normalize('NFC').replace(/\s+/g, ' ').trim())
+  const target = normalize(expected)
+  const output = normalize(actual)
+  let previous = Array.from({ length: output.length + 1 }, (_, index) => index)
+  for (const [index, letter] of target.entries()) {
+    const current = [index + 1]
+    for (const [column, candidate] of output.entries()) {
+      current.push(Math.min(current[column] + 1, previous[column + 1] + 1, previous[column] + Number(letter !== candidate)))
+    }
+    previous = current
+  }
+  return Math.max(0, 1 - previous[output.length] / target.length)
+}
 
 async function makeFixtures() {
   const a = await PDFDocument.create()
@@ -191,9 +207,13 @@ try {
   }
 
   const upload = async (files) => {
-    const objectId = (
-      await send('Runtime.evaluate', { expression: `document.querySelector('input[type=file]')` })
-    ).result.objectId
+    let objectId
+    for (let attempt = 0; attempt < 24 && !objectId; attempt++) {
+      const { result } = await send('Runtime.evaluate', { expression: `document.querySelector('input[type=file]')` })
+      objectId = result.objectId
+      if (!objectId) await sleep(250)
+    }
+    if (!objectId) throw new Error(`Input berkas belum tersedia di ${state.page}`)
     await send('DOM.setFileInputFiles', { files, objectId })
     await sleep(900)
   }
@@ -233,16 +253,19 @@ try {
     const info = spawnSync('pdfinfo', [file], { encoding: 'utf8' })
     return info.status === 0 ? Number(/Pages:\s+(\d+)/.exec(info.stdout)?.[1]) : null
   }
-  const textIn = (file) => spawnSync('pdftotext', [file, '-'], { encoding: 'utf8' }).stdout ?? ''
+  const textIn = (file, page) => spawnSync('pdftotext', [...(page ? ['-f', String(page), '-l', String(page)] : []), file, '-'], { encoding: 'utf8' }).stdout ?? ''
 
   console.log('\nGabung PDF')
   await go('/alat/gabung-pdf/')
   await upload([PDF_A, PDF_B])
-  check((await evaluate('document.body.innerText')).includes('2 berkas') || true, 'dua berkas terdaftar')
+  check(await evaluate(`[...document.querySelectorAll('button')].some(b => !b.disabled && b.textContent.trim() === 'Gabung 2 PDF')`), 'dua berkas terdaftar')
   await clickText('Gabung')
   let files = await waitDownload('.pdf')
   check(files.length === 1, 'hasil gabung terunduh')
-  if (files[0]) check(pageCount(files[0]) === 3, 'gabungan berisi 3 halaman', String(pageCount(files[0])))
+  if (files[0]) {
+    check(pageCount(files[0]) === 3, 'gabungan berisi 3 halaman', String(pageCount(files[0])))
+    check(['DOKUMEN SATU halaman 1', 'DOKUMEN SATU halaman 2', 'DOKUMEN DUA'].every((expected, index) => textIn(files[0], index + 1).includes(expected)), 'urutan isi gabungan tepat')
+  }
   cleanDownloads()
 
   console.log('\nPisah PDF')
@@ -255,6 +278,14 @@ try {
   await evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.includes('Unduh semua')).click()`)
   files = await waitDownload('.zip')
   check(files.length === 1, 'hasil pisah terunduh sebagai ZIP')
+  if (files[0]) {
+    for (const [index, expected] of ['DOKUMEN SATU halaman 1', 'DOKUMEN SATU halaman 2'].entries()) {
+      const pageFile = path.join(WORK, `pisah-${index + 1}.pdf`)
+      const entry = spawnSync('unzip', ['-p', files[0], `satu-hal-${index + 1}.pdf`])
+      if (entry.status === 0) fs.writeFileSync(pageFile, entry.stdout)
+      check(entry.status === 0 && pageCount(pageFile) === 1 && textIn(pageFile).includes(expected), `hasil pisah berisi halaman ${index + 1} yang tepat`)
+    }
+  }
   cleanDownloads()
 
   console.log('\nPutar PDF')
@@ -264,15 +295,17 @@ try {
   await clickText('Putar dan unduh')
   files = await waitDownload('.pdf')
   check(files.length === 1, 'PDF hasil putar terunduh')
+  if (files[0]) check((await PDFDocument.load(fs.readFileSync(files[0]))).getPage(0).getRotation().angle === 180, 'rotasi 90° ditambahkan ke rotasi awal 90°')
   cleanDownloads()
 
   console.log('\nWatermark PDF')
   await go('/alat/watermark-pdf/')
   await upload([PDF_A])
+  await clickText('Miring')
   await clickText('Tambah watermark')
   files = await waitDownload('.pdf')
   check(files.length === 1, 'PDF berwatermark terunduh')
-  if (files[0]) check(pageCount(files[0]) === 2, 'jumlah halaman tetap')
+  if (files[0]) check(pageCount(files[0]) === 2 && [1, 2].every((page) => textIn(files[0], page).includes('RAHASIA')), 'watermark ada di kedua halaman tanpa mengubah jumlahnya')
   cleanDownloads()
 
   console.log('\nFoto ke PDF')
@@ -282,6 +315,59 @@ try {
   files = await waitDownload('.pdf')
   check(files.length === 1, 'PDF dari gambar terunduh')
   if (files[0]) check(pageCount(files[0]) === 1, 'satu halaman')
+  cleanDownloads()
+
+  const cameraImages = await evaluate(`(() => {
+    const canvas = document.createElement('canvas'); canvas.width = 120; canvas.height = 80;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 120, 80);
+    ctx.fillStyle = '#fa0808'; ctx.fillRect(0, 0, 65, 38);
+    return { jpeg: canvas.toDataURL('image/jpeg', 0.98).split(',')[1], webp: canvas.toDataURL('image/webp', 0.95).split(',')[1] };
+  })()`)
+  const jpegBytes = Buffer.from(cameraImages.jpeg, 'base64')
+  const exifOrientation6 = Buffer.from('ffe1002245786966000049492a0008000000010012010300010000000600000000000000', 'hex')
+  fs.writeFileSync(CAMERA_JPEG, Buffer.concat([jpegBytes.subarray(0, 2), exifOrientation6, jpegBytes.subarray(2)]))
+  await go('/alat/foto-ke-pdf/')
+  await upload([CAMERA_JPEG])
+  await clickText('Ikut gambar')
+  await clickText('Buat PDF')
+  files = await waitDownload('.pdf')
+  if (files[0]) {
+    const page = (await PDFDocument.load(fs.readFileSync(files[0]))).getPage(0)
+    const ppm = spawnSync('pdftoppm', ['-r', '72', '-singlefile', files[0]]).stdout
+    const header = /^P6\s+80\s+120\s+255\n/.exec(ppm.toString('latin1', 0, 80))
+    const pixel = header ? header[0].length + 3 * (20 * 80 + 60) : 0
+    check(page.getWidth() === 80 && page.getHeight() === 120 && header && ppm[pixel] > 200 && ppm[pixel + 1] < 40,
+      'foto JPEG EXIF berotasi ke orientasi visual yang benar')
+  } else check(false, 'foto JPEG dengan EXIF terunduh')
+  cleanDownloads()
+
+  const webpDisguised = path.join(WORK, 'foto-webp-salah-ekstensi.png')
+  const avif = path.join(WORK, 'foto.avif')
+  const gif = path.join(WORK, 'foto.gif')
+  const bmp = path.join(WORK, 'foto.bmp')
+  fs.writeFileSync(webpDisguised, Buffer.from(cameraImages.webp, 'base64'))
+  fs.writeFileSync(avif, Buffer.from('AAAAHGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZgAAAOptZXRhAAAAAAAAACFoZGxyAAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAAA5waXRtAAAAAAABAAAAImlsb2MAAAAAREAAAQABAAAAAAEOAAEAAAAAAAAAIAAAACNpaW5mAAAAAAABAAAAFWluZmUCAAAAAAEAAGF2MDEAAAAAamlwcnAAAABLaXBjbwAAABNjb2xybmNseAABAA0ABoAAAAAMYXYxQ4FAbAAAAAAUaXNwZQAAAAAAAAAMAAAACAAAABBwaXhpAAAAAAMMDAwAAAAXaXBtYQAAAAAAAAABAAEEAYIDBAAAAChtZGF0EgAKCVgMr7GgIaDcIDIRGAAOOOOEAADDXtKTyOyfvoE=', 'base64'))
+  fs.writeFileSync(gif, Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAEALAAAAAABAAEAAAIBRAA7', 'base64'))
+  const bmpBytes = Buffer.alloc(78)
+  bmpBytes.write('BM')
+  bmpBytes.writeUInt32LE(bmpBytes.length, 2)
+  bmpBytes.writeUInt32LE(54, 10)
+  bmpBytes.writeUInt32LE(40, 14)
+  bmpBytes.writeInt32LE(2, 18)
+  bmpBytes.writeInt32LE(3, 22)
+  bmpBytes.writeUInt16LE(1, 26)
+  bmpBytes.writeUInt16LE(24, 28)
+  bmpBytes.writeUInt32LE(24, 34)
+  fs.writeFileSync(bmp, bmpBytes)
+  await go('/alat/foto-ke-pdf/')
+  await upload([webpDisguised, avif, gif, bmp])
+  await clickText('Ikut gambar')
+  await clickText('Buat PDF')
+  files = await waitDownload('.pdf')
+  if (files[0]) {
+    const sizes = (await PDFDocument.load(fs.readFileSync(files[0]))).getPages().map((page) => `${page.getWidth()}x${page.getHeight()}`)
+    check(sizes.join(',') === '120x80,12x8,1x1,2x3', 'WebP salah ekstensi, AVIF, GIF, dan BMP menjadi PDF dalam urutan dan ukuran yang benar')
+  } else check(false, 'PDF dari input berbagai format terunduh')
   cleanDownloads()
 
   console.log('\nFoto ke Word')
@@ -309,6 +395,7 @@ try {
     ctx.textAlign = 'left'
     ctx.fillText('Dokumen ini menerangkan bahwa', 100, 250)
     ctx.fillText('Budi Santoso hadir pada hari Senin.', 100, 295)
+    ctx.fillText('Yang bertanda tangan di bawah ini :', 100, 341)
     ctx.fillText('Nama', 130, 385)
     ctx.fillText(': Budi Santoso', 435, 385)
     ctx.strokeStyle = '#234ba0'
@@ -322,6 +409,10 @@ try {
     ctx.moveTo(616, 959)
     ctx.bezierCurveTo(664, 916, 639, 984, 745, 955)
     ctx.stroke()
+    ctx.fillStyle = '#222'
+    ctx.font = '22px Arial'
+    ctx.fillText('PENANGGUNG JAWAB', 590, 925)
+    ctx.fillText('MIRA PRATAMA', 580, 1005)
     return canvas.toDataURL('image/png').split(',')[1]
   })()`)
   fs.writeFileSync(PHOTO, Buffer.from(photoData, 'base64'))
@@ -358,8 +449,14 @@ try {
       check(xml.includes('<w:t xml:space="preserve">Dewi Sari &amp; Rekan hadir'), 'koreksi tersimpan sebagai teks Word')
       check(xml.includes('<w:jc w:val="center"') && xml.includes('<w:ind w:left='), 'rata tengah dan inden tersimpan')
       check(xml.includes('<w:pBdr>') && xml.includes('<w:tabs>'), 'garis kop dan tab formulir tersimpan')
-      check(xml.includes('Logo kop surat') && xml.includes('Tanda tangan dan stempel'),
-        'logo, tanda tangan, dan stempel dipertahankan sebagai gambar di DOCX editable')
+      check(['Logo kop surat', 'Stempel', 'Tanda tangan'].every((label) => xml.includes(`name="${label}"`)) &&
+        (xml.match(/<wp:anchor\b/g) ?? []).length === 3,
+        'logo, tanda tangan, dan stempel masing-masing tersimpan sebagai gambar Word')
+      check(xml.includes('>PENANGGUNG JAWAB</w:t>') && xml.includes('>MIRA PRATAMA</w:t>'),
+        'jabatan dan nama di area stempel tetap menjadi teks Word')
+      check((xml.match(/<w:r>.*?<\/w:r>/g) ?? []).some((run) =>
+        run.includes('Yang bertanda tangan di bawah ini') && run.includes('<w:b/>')),
+      'baris pengantar tanda tangan tersimpan dalam huruf tebal')
     }
     cleanDownloads()
     await clickText('Pilih area gambar')
@@ -411,20 +508,20 @@ try {
     ctx.fillText('LAMPIRAN DIGITAL', 105, 145)
     ctx.font = '26px Arial'
     ctx.fillText('Kode lampiran 34825.', 105, 225)
-    return canvas.toDataURL('image/png').split(',')[1]
+    return canvas.toDataURL('image/webp', 0.95).split(',')[1]
   })()`)
   fs.writeFileSync(PHOTO_TWO, Buffer.from(photoTwo, 'base64'))
   await go('/alat/foto-ke-word/')
   await upload([PHOTO, PHOTO_TWO])
   await evaluate(`document.querySelector('[aria-label="Putar foto 90 derajat"]').click()`)
-  await evaluate(`document.querySelector('[aria-label="Naikkan lampiran.png"]').click()`)
+  await evaluate(`document.querySelector('[aria-label="Naikkan lampiran.webp"]').click()`)
   await clickText('Baca semua foto yang tersisa')
   let bothReady = false
   for (let i = 0; i < 120 && !bothReady; i++) {
     bothReady = await evaluate(`[...document.querySelectorAll('button')].some(b => !b.disabled && b.textContent.includes('Unduh Word (.docx)'))`)
     if (!bothReady) await sleep(250)
   }
-  check(bothReady, 'dua foto selesai dibaca dalam satu pekerjaan')
+  check(bothReady, 'PNG dan WebP selesai dibaca dalam satu pekerjaan')
   if (bothReady) {
     await clickText('Unduh Word')
     files = await waitDownload('.docx')
@@ -446,6 +543,23 @@ try {
   scanPage.drawImage(scanImage, { width: 700, height: 495 })
   scanPage.setRotation(degrees(90))
   scan.addPage().drawText('NATIVE TEXT PRESENT')
+  const reference = [
+    'BERITA ACARA PENYERAHAN',
+    'Pada Senin, 23 November 2026, dokumen ini diterima.',
+    'Nomor dokumen: 017/ADM/2026.',
+    'Jumlah lampiran 12 berkas dan 4 lembar persetujuan.',
+    'Penanggung jawab: Rina Setiawan.',
+  ]
+  const referencePng = await evaluate(`(() => {
+    const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 660;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = '#f0f0eb'; ctx.fillRect(0, 0, 1200, 660);
+    ctx.fillStyle = '#53534b'; ctx.font = '36px serif';
+    ${JSON.stringify(reference)}.forEach((line, index) => ctx.fillText(line, 100, 125 + 95 * index));
+    return canvas.toDataURL('image/png').split(',')[1];
+  })()`)
+  const mixedPage = scan.addPage([600, 400])
+  mixedPage.drawImage(await scan.embedPng(Buffer.from(referencePng, 'base64')), { x: 0, y: 55, width: 600, height: 330 })
+  mixedPage.drawText('HALAMAN 03', { x: 44, y: 23, size: 14 })
   fs.writeFileSync(SCAN, await scan.save())
   await go('/alat/pdf-bisa-dicari/')
   await upload([SCAN])
@@ -457,7 +571,12 @@ try {
     check(extracted.includes('SURAT KETERANGAN') && extracted.includes('NATIVE TEXT PRESENT'),
       'teks halaman scan yang diputar dan halaman teks asli dapat diekstrak')
     const doc = await PDFDocument.load(fs.readFileSync(files[0]))
-    check(doc.getPageCount() === 2 && doc.getPage(0).getRotation().angle === 90, 'jumlah dan orientasi halaman scan tetap')
+    check(doc.getPageCount() === 3 && doc.getPage(0).getRotation().angle === 90, 'jumlah dan orientasi halaman scan tetap')
+    const mixedText = textIn(files[0], 3)
+    check((mixedText.match(/HALAMAN 03/g) ?? []).length === 1, 'nomor halaman asli tidak diduplikasi oleh OCR')
+    const accuracy = characterAccuracy(reference.join(' '), mixedText.replace('HALAMAN 03', ''))
+    check(accuracy >= 0.99, 'OCR sampel scan campuran memenuhi target akurasi karakter', `${(accuracy * 100).toFixed(2)}%`)
+    console.log(`  OCR sampel Indonesia campuran: ${(accuracy * 100).toFixed(2)}% akurasi karakter setelah normalisasi spasi`)
     if (process.env.E2E_KEEP) fs.copyFileSync(files[0], path.join(WORK, 'hasil-searchable.pdf'))
   }
   cleanDownloads()
@@ -562,6 +681,33 @@ try {
   check(files.length === 1, 'PDF terkompres terunduh')
   cleanDownloads()
 
+  const compressionInput = await PDFDocument.load(fs.readFileSync(PDF_A), { updateMetadata: false })
+  const uncompressed = await compressionInput.save({ useObjectStreams: false })
+  const compressionFile = path.join(WORK, 'target-ukuran.pdf')
+  fs.writeFileSync(compressionFile, uncompressed)
+  const limit = Math.floor((uncompressed.length + (await compressionInput.save()).length) / 2)
+  await go('/alat/kompres-pdf/')
+  await upload([compressionFile])
+  await evaluate(`(() => {
+    const field = document.querySelector('select'); field.value = 'retain';
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector('input[type=checkbox]').click();
+  })()`)
+  await evaluate(`(() => {
+    const unit = [...document.querySelectorAll('select')].find(el => [...el.options].some(o => o.value === 'KB'));
+    unit.value = 'KB'; unit.dispatchEvent(new Event('change', { bubbles: true }));
+    const input = document.querySelector('input[type=number]');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(String(limit / 1000))});
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`)
+  await clickText('Kompres PDF')
+  for (let i = 0; i < 30 && !(await evaluate('document.body.innerText')).includes('Unduh hasil'); i++) await sleep(200)
+  await clickText('Unduh hasil')
+  files = await waitDownload('.pdf')
+  check(files.length === 1 && fs.statSync(files[0]).size <= limit && pageCount(files[0]) === 2 &&
+    textIn(files[0]).includes('DOKUMEN SATU halaman 2'), 'batas ukuran dalam byte tercapai tanpa kehilangan halaman atau teks')
+  cleanDownloads()
+
   console.log('\nIsi Formulir PDF')
   await go('/alat/isi-formulir-pdf/')
   await upload([FORM])
@@ -581,6 +727,10 @@ try {
   await clickText('Simpan dan unduh')
   files = await waitDownload('.pdf')
   check(files.length === 1, 'PDF terisi terunduh')
+  if (files[0]) {
+    const form = (await PDFDocument.load(fs.readFileSync(files[0]))).getForm()
+    check(form.getTextField('nama_lengkap').getText() === 'Budi Santoso' && form.getCheckBox('setuju').isChecked(), 'nilai teks dan centang tersimpan benar di AcroForm')
+  }
   cleanDownloads()
 
   console.log('\nTanda Tangan Massal')
@@ -589,10 +739,18 @@ try {
   const batchReady = (await evaluate('document.body.innerText')).includes('Buat baru')
   check(batchReady, 'alat massal tampil')
   await evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Buat baru').click()`)
-  await sleep(400)
+  const imageInput = await send('Runtime.evaluate', { expression: `document.querySelector('input[type=file][accept*=".webp"]')` })
+  await send('DOM.setFileInputFiles', { files: [webpDisguised], objectId: imageInput.result.objectId })
+  let signatureImage = false
+  for (let i = 0; i < 20 && !signatureImage; i++) {
+    signatureImage = await evaluate(`document.querySelector('img[alt="Pratinjau tanda tangan"]')?.src.startsWith('data:image/png;base64,') ?? false`)
+    if (!signatureImage) await sleep(150)
+  }
+  check(signatureImage, 'unggahan tanda tangan menerima WebP meski nama berakhiran PNG')
   const pad = await evaluate(`(() => {
     const el = document.querySelector('canvas[aria-label="Area gambar tanda tangan"]')
     if (!el) return null
+    el.scrollIntoView({ block: 'center', behavior: 'instant' })
     const r = el.getBoundingClientRect()
     return { x: r.x, y: r.y, w: r.width, h: r.height }
   })()`)
@@ -606,7 +764,7 @@ try {
   await sleep(300)
   await clickText('Simpan tanda tangan')
   await sleep(600)
-  check((await evaluate('document.body.innerText')).includes('Tandatangani'), 'tombol massal tersedia')
+  check(await evaluate(`[...document.querySelectorAll('button')].some(b => !b.disabled && b.textContent.trim().startsWith('Tandatangani'))`), 'gambar tanda tangan siap dipakai di alat massal')
   await clickText('Tandatangani')
   await sleep(4000)
   const outCount = await evaluate(`[...document.querySelectorAll('button')].filter((b) => b.textContent.includes('Unduh semua')).length`)
@@ -618,9 +776,54 @@ try {
     if (files[0]) {
       const listing = spawnSync('unzip', ['-l', files[0]], { encoding: 'utf8' })
       check(listing.status === 0 && /2 files/.test(listing.stdout), 'ZIP berisi 2 berkas', listing.stdout?.split('\n').slice(-3).join(' '))
+      const signed = spawnSync('unzip', ['-p', files[0], 'satu-ttd.pdf'])
+      if (signed.status === 0) {
+        const pages = (await PDFDocument.load(signed.stdout)).getPages()
+        const counts = pages.map((page) => page.node.Resources()?.lookup(PDFName.of('XObject'))?.keys()?.length ?? 0)
+        check(counts[0] === 0 && counts[1] === 1, 'gambar tanda tangan hanya ada pada halaman terakhir')
+      } else check(false, 'hasil massal berisi PDF yang dapat diverifikasi')
     }
   }
   cleanDownloads()
+
+  console.log('\nWorkflow PDF')
+  await go('/alat/workflow-pdf/')
+  await upload([PDF_A, PDF_B])
+  await clickText('+ Putar semua halaman')
+  check(await clickText('Jalankan dan unduh PDF'), 'workflow bisa dijalankan')
+  files = await waitDownload('.pdf')
+  if (files[0]) {
+    const doc = await PDFDocument.load(fs.readFileSync(files[0]))
+    check(doc.getPageCount() === 3 && doc.getPages().map((page) => page.getRotation().angle).join(',') === '90,90,180', 'workflow menggabungkan dan memutar seluruh halaman sesuai urutan')
+  } else check(false, 'hasil workflow terunduh')
+  cleanDownloads()
+
+  console.log('\nBandingkan PDF')
+  const comparisonPair = await Promise.all(['https://awal.example/', 'https://revisi.example/'].map(async (url, index) => {
+    const doc = await PDFDocument.create()
+    const samePage = doc.addPage()
+    samePage.drawText('Teks dan tampilan identik')
+    const linkedPage = doc.addPage()
+    linkedPage.drawText('Tautan di bawah ini berubah', { x: 40, y: 780 })
+    linkedPage.node.set(PDFName.of('Annots'), doc.context.obj([{
+      Type: 'Annot', Subtype: 'Link', Rect: [30, 750, 200, 775], Border: [0, 0, 0],
+      A: { S: 'URI', URI: PDFString.of(url) },
+    }]))
+    const file = path.join(WORK, `tautan-${index}.pdf`)
+    fs.writeFileSync(file, await doc.save())
+    return file
+  }))
+  await go('/alat/bandingkan-pdf/')
+  const right = await send('Runtime.evaluate', { expression: `document.querySelectorAll('input[type=file]')[1]` })
+  await send('DOM.setFileInputFiles', { files: [comparisonPair[1]], objectId: right.result.objectId })
+  await upload([comparisonPair[0]])
+  check(await clickText('Bandingkan semua halaman'), 'dua versi dapat dibandingkan')
+  let compared = false
+  for (let i = 0; i < 30 && !compared; i++) {
+    compared = (await evaluate('document.body.innerText')).includes('1 dari 2 halaman berbeda')
+    if (!compared) await sleep(200)
+  }
+  check(compared, 'perubahan URL terdeteksi walau teks dan tampilan halaman sama')
 
   console.log('\nRute konten')
   await go('/')

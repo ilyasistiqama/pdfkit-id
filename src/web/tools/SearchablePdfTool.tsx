@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { downloadBlob, pdfBlob } from '../../core/download'
 import type { OcrLanguage } from '../../core/photoOcr'
 import { trackDownload } from '../../site/analytics'
+import { confirmSignedPdfChange, SignedPdfNotice } from './SignedPdfNotice'
 import { ActionButton, DropZone, Field, Status, ToolBody, inputClass } from './ToolUi'
 
 export default function SearchablePdfTool() {
@@ -23,6 +24,7 @@ export default function SearchablePdfTool() {
     setResult(null)
     setProgress('Menyiapkan pembaca PDF…')
     try {
+      if (!await confirmSignedPdfChange(file, controller.signal)) return
       const { makeSearchablePdf } = await import('../../core/searchablePdf')
       const response = await makeSearchablePdf(new Uint8Array(await file.arrayBuffer()), language, controller.signal,
         (page, total, value) => setProgress(`Halaman ${page}/${total}${value === undefined ? '' : ` · ${Math.floor(value * 100)}%`}`))
@@ -52,6 +54,7 @@ export default function SearchablePdfTool() {
             <button type="button" disabled={busy} className="shrink-0 text-sm text-gold hover:underline"
               onClick={() => { setFile(null); setResult(null); setError('') }}>Ganti PDF</button>
           </div>
+          <SignedPdfNotice source={file} />
           <Field label="Bahasa dokumen">
             <select className={inputClass} value={language} disabled={busy} onChange={(event) => setLanguage(event.target.value as OcrLanguage)}>
               <option value="ind">Indonesia</option>

@@ -110,3 +110,42 @@ export function PdfToolPreview({ doc, number, rotation = 0, thumbnail = false, o
     </>
   )
 }
+
+export function PdfResultPreview({ bytes, firstPage = 1 }: { bytes: Uint8Array; firstPage?: number }) {
+  const [opened, setOpened] = useState<{ bytes: Uint8Array; doc: PDFDocumentProxy } | null>(null)
+  const [failed, setFailed] = useState<Uint8Array | null>(null)
+  const [number, setNumber] = useState(firstPage)
+
+  useEffect(() => {
+    let current = true
+    let session: PdfSession | undefined
+    void loadPdf(bytes).then((next) => {
+      if (!current) return next.destroy()
+      session = next
+      setOpened({ bytes, doc: next.doc })
+    }).catch(() => { if (current) setFailed(bytes) })
+    return () => {
+      current = false
+      void session?.destroy().catch(() => {})
+    }
+  }, [bytes])
+
+  if (failed === bytes) return <p role="status" className="text-sm text-loss">Pratinjau PDF gagal dibuka.</p>
+  if (opened?.bytes !== bytes) return <p role="status" className="text-sm text-muted">Membuka pratinjau…</p>
+  const { doc } = opened
+  const page = Math.max(1, Math.min(number, doc.numPages))
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-center gap-3 text-sm">
+        <button type="button" className="rounded-lg bg-sunken px-3 py-2 disabled:opacity-35" disabled={page <= 1}
+          onClick={() => setNumber(page - 1)}>Sebelumnya</button>
+        <span className="tabular-nums">Halaman {page} / {doc.numPages}</span>
+        <button type="button" className="rounded-lg bg-sunken px-3 py-2 disabled:opacity-35" disabled={page >= doc.numPages}
+          onClick={() => setNumber(page + 1)}>Berikutnya</button>
+      </div>
+      <div className="relative mx-auto min-h-24 max-w-lg overflow-hidden rounded-lg bg-sunken ring-1 ring-line">
+        <PdfToolPreview doc={doc} number={page} />
+      </div>
+    </div>
+  )
+}

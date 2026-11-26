@@ -23,6 +23,12 @@ export async function signPdf(
   title?: string,
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.load(bytes, { updateMetadata: false })
+  return signPdfDocument(doc, placements, signatures, title)
+}
+
+export async function signPdfDocument(
+  doc: PDFDocument, placements: Placement[], signatures: Signature[], title?: string,
+): Promise<Uint8Array> {
   const pages = doc.getPages()
   const images = new Map<string, PDFImage>()
   const byId = new Map(signatures.map((signature) => [signature.id, signature]))

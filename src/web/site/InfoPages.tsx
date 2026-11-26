@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { OPEN_PRIVACY_SETTINGS } from '../../site/privacyPreferences'
+import { BATCH_TEMPLATE_KEY, clearBrowserCopy, hasBrowserCopy, SIGNATURE_STORAGE_KEY, WORKFLOW_PRESET_KEY } from '../signatureStore'
 import { Link } from '../../router'
 import { CONTACT_EMAIL, SITE_NAME } from '../../site/site'
 import { consentNeeded } from '../../site/consent'
@@ -58,10 +60,9 @@ export function AboutPage() {
 
       <H2>Yang perlu Anda ketahui</H2>
       <P>
-        Tanda tangan yang dihasilkan adalah tanda tangan elektronik berbentuk gambar. Ini sah untuk
-        banyak keperluan sehari-hari, tetapi bukan tanda tangan digital tersertifikasi dengan
-        sertifikat kriptografis. Untuk dokumen yang mensyaratkanPSrE, gunakan penyelenggara
-        sertifikasi resmi.
+        PDFKit menempelkan gambar tanda tangan pada salinan PDF. Tanyakan format yang diterima pihak
+        tujuan. Untuk dokumen yang mensyaratkan tanda tangan elektronik tersertifikasi, gunakan
+        Penyelenggara Sertifikasi Elektronik (PSrE) Indonesia yang diakui.
       </P>
 
       <H2>Kontak</H2>
@@ -76,76 +77,56 @@ export function AboutPage() {
   )
 }
 
+function StoredDataControls() {
+  const entries = [
+    [SIGNATURE_STORAGE_KEY, 'Hapus gambar tanda tangan tersimpan'],
+    [BATCH_TEMPLATE_KEY, 'Hapus template tanda tangan tersimpan'],
+    [WORKFLOW_PRESET_KEY, 'Hapus preset workflow tersimpan'],
+  ] as const
+  const [copies, setCopies] = useState<string[]>([])
+  const [message, setMessage] = useState('')
+  const refresh = () => setCopies(entries.map(([key]) => key).filter(hasBrowserCopy))
+  useEffect(refresh, [])
+  if (!copies.length && !message) return null
+  return <div className="space-y-2 rounded-xl bg-sunken p-3 text-sm">
+    {copies.length > 0 && <p>Unduh gambar PNG yang ingin disimpan sebelum menghapus salinan browser. Data sementara dalam tab akan hilang saat tab ditutup atau dimuat ulang.</p>}
+    {entries.filter(([key]) => copies.includes(key)).map(([key, label]) => (
+      <button key={key} type="button" className="block font-medium text-loss hover:underline" onClick={() => {
+        const removed = clearBrowserCopy(key)
+        refresh()
+        setMessage(removed ? 'Salinan penyimpanan browser sudah dihapus.' : 'Salinan belum bisa dihapus dari browser.')
+      }}>{label}</button>
+    ))}
+    {message && <p role="status">{message}</p>}
+  </div>
+}
+
 export function PrivacyPage() {
   return (
     <Page
       title="Kebijakan Privasi"
       lede={
-        consentNeeded()
-          ? 'Ringkasnya: isi dokumen Anda tidak pernah dikirim ke server. Yang diproses pihak ketiga hanya iklan dan statistik kunjungan, dan itu pun setelah Anda menyetujui cookie.'
-          : 'Ringkasnya: isi dokumen Anda tidak pernah dikirim ke server. Saat ini situs tidak memuat iklan, analitik, atau cookie pihak ketiga.'
+        'PDFKit memproses berkas di browser. Halaman ini menjelaskan penyimpanan lokal, log hosting, serta pilihan untuk analitik dan iklan.'
       }
     >
-      <p className="text-[0.78rem] text-muted">Terakhir diperbarui: 20 November 2026</p>
+      <p className="text-[0.78rem] text-muted">Terakhir diperbarui 26 November 2026</p>
 
-      <H2>1. Isi dokumen tetap di perangkat Anda</H2>
-      <P>
-        Semua pemrosesan PDF — membuka, menandatangani, menggabung, memisah, mengompres, dan
-        mengonversi — dilakukan di browser Anda. Berkas tidak diunggah, tidak disalin ke server, dan
-        tidak disimpan di luar perangkat. Menutup tab menghapus dokumen dari memori.
-      </P>
+      <H2>Pemrosesan berkas dan hosting</H2>
+      <P>Alat PDFKit membaca, mengolah, dan membuat salinan hasil di browser Anda. PDFKit tidak mengunggah isi berkas, nama berkas, atau gambar tanda tangan ke server. Berkas yang Anda unduh tersimpan di lokasi unduhan perangkat.</P>
+      <P>GitHub Pages sebagai penyedia hosting mencatat alamat IP pengunjung untuk keamanan, termasuk saat analitik dan iklan opsional dimatikan. <a href="https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages#data-collection" className="text-gold underline">Penjelasan GitHub Pages</a></P>
 
-      <H2>2. Yang disimpan di perangkat</H2>
-      <UL>
-        <li>Gambar tanda tangan tersimpan di <em>localStorage</em> agar tidak perlu digambar ulang. Tombol “Tersimpan” bisa dimatikan, dan data langsung dihapus saat dimatikan.</li>
-        {consentNeeded() && (
-          <li>Pilihan persetujuan cookie disimpan agar Anda tidak ditanya berulang.</li>
-        )}
-        <li>Tidak ada data dokumen yang disimpan di penyimpanan perangkat.</li>
-      </UL>
+      <H2>Penyimpanan di browser</H2>
+      <P>Gambar tanda tangan tersedia sementara. Pada origin khusus yang mendukung penyimpanan lokal, Anda bisa memilih “Simpan di browser” atau mengunduh PNG sendiri. Template dan preset yang Anda simpan dapat memuat nama, jabatan, tanggal, atau teks watermark. Pada alamat berbagi proyek, penyimpanan baru hanya berlaku selama tab terbuka. Pilihan privasi disimpan secara lokal bila browser mengizinkannya.</P>
+      <StoredDataControls />
 
-      <H2>3. Iklan dan cookie pihak ketiga</H2>
-      {!consentNeeded() && (
-        <P>
-          <strong>Saat ini belum ada iklan atau analitik yang aktif</strong>, sehingga tidak ada
-          cookie pihak ketiga. Bila iklan diaktifkan nanti, notice persetujuan akan muncul lebih
-          dulu dan ketentuan di bawah ini berlaku.
-        </P>
-      )}
-      <P>
-        Situs ini gratis dan direncanakan dibiayai iklan. Setelah Anda menyetujui, penyedia iklan (misalnya Google
-        AdSense) dapat memakai cookie dan pengenal untuk menampilkan serta mengukur iklan. Penyedia
-        iklan dapat memproses data seperti perkiraan lokasi, jenis perangkat, dan halaman yang
-        dikunjungi — <strong>tidak termasuk isi dokumen Anda</strong>, karena dokumen tidak pernah
-        meninggalkan perangkat.
-      </P>
-      <UL>
-        <li>Anda bisa menolak lewat notice cookie; situs tetap berfungsi penuh tanpa iklan personal.</li>
-        {consentNeeded() && (
-          <li>Pengaturan bisa diubah kapan saja lewat tautan “Pengaturan cookie” di bagian bawah halaman.</li>
-        )}
-        <li>Menonaktifkan personalisasi iklan Google: kunjungi pengaturan iklan akun Google Anda.</li>
-      </UL>
+      <H2>Analitik dan iklan opsional</H2>
+      <P>Jika Anda mengizinkan analitik dan fitur itu tersedia, penyedia analitik dapat menerima statistik unduhan seperti alat dan halaman yang digunakan, serta data koneksi normal. Kode analitik berjalan di frame terisolasi. Pencabutan izin menutup frame dan menghentikan pengiriman event baru dari PDFKit.</P>
+      <P>Jika iklan diaktifkan, layanan pengelola consent dan Google AdSense dapat memproses data seperti alamat IP, jenis perangkat, pengenal, dan halaman panduan yang dikunjungi. Slot membutuhkan pilihan iklan dari Anda dan sinyal yang diperlukan dari pengelola consent. Mencabut izin iklan akan memuat ulang halaman panduan jika layanan iklan sudah dimulai.</P>
+      {consentNeeded() && <button type="button" className="font-medium text-gold hover:underline"
+        onClick={() => window.dispatchEvent(new Event(OPEN_PRIVACY_SETTINGS))}>Buka pengaturan privasi</button>}
 
-      <H2>4. Analitik</H2>
-      <P>
-        Bila diaktifkan, situs mencatat statistik agregat seperti jumlah kunjungan dan peristiwa
-        “dokumen berhasil diunduh”. Analitik hanya dimuat setelah persetujuan dan tidak menerima isi
-        dokumen atau nama berkas.
-      </P>
-
-      <H2>5. Dasar hukum dan hak Anda</H2>
-      <P>
-        Untuk pengunjung Indonesia, pemrosesan data oleh pihak ketiga mengacu pada UU No. 27 Tahun
-        2022 tentang Pelindungan Data Pribadi. Anda berhak mengetahui, mengubah, dan menarik
-        persetujuan.{' '}
-        {consentNeeded() && 'Menarik persetujuan cookie cukup dilakukan lewat “Pengaturan cookie”. '}
-        Untuk permintaan lain, hubungi{' '}
-        <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-gold hover:underline">
-          {CONTACT_EMAIL}
-        </a>
-        .
-      </P>
+      <H2>Kontak dan hak privasi</H2>
+      <P>Untuk pertanyaan, akses, koreksi, penghapusan, atau permintaan terkait data yang dikelola PDFKit, hubungi <a href={`mailto:${CONTACT_EMAIL}`} className="text-gold underline">{CONTACT_EMAIL}</a>. Hindari melampirkan berkas sensitif pada laporan awal.</P>
 
       <H2>6. Anak-anak</H2>
       <P>
@@ -168,21 +149,17 @@ export function TermsPage() {
       title="Syarat dan Ketentuan"
       lede="Dengan memakai situs ini, Anda menyetujui ketentuan di bawah. Baca bagian tentang batas tanggung jawab dan status tanda tangan."
     >
-      <p className="text-[0.78rem] text-muted">Terakhir diperbarui: 20 November 2026</p>
+      <p className="text-[0.78rem] text-muted">Terakhir diperbarui 26 November 2026</p>
 
       <H2>1. Penggunaan layanan</H2>
       <P>
         {SITE_NAME} boleh dipakai untuk keperluan pribadi maupun komersial tanpa biaya. Anda
-        bertanggung jawab memastikan bahwa Anda berhak menandatangani dokumen yang Anda proses dan
-        bahwa penggunaannya sah.
+        hanya boleh memproses dokumen yang berhak Anda gunakan. Gunakan gambar tanda tangan atau paraf sendiri atau gambar yang telah diizinkan pemiliknya. Penggunaan untuk menyamar sebagai pihak lain atau memalsukan dokumen dilarang.
       </P>
 
       <H2>2. Status tanda tangan</H2>
       <P>
-        Hasil aplikasi ini adalah tanda tangan elektronik berbentuk gambar. Ini bukan tanda tangan
-        digital tersertifikasi dan tidak memiliki sertifikat, segel waktu, atau jejak audit
-        kriptografis. Untuk dokumen yang mewajibkan tanda tangan tersertifikasi, gunakan penyelenggara
-        sertifikasi elektronik (PSrE) yang terdaftar.
+        Alat tanda tangan menghasilkan salinan PDF dengan gambar tanda tangan. Untuk dokumen yang mensyaratkan penandatanganan tersertifikasi, gunakan layanan PSrE Indonesia yang diakui. Simpan dokumen asli yang telah ditandatangani secara digital. Pengeditan dan ekspor ulang bisa membatalkan tanda tangan pada salinan hasil.
       </P>
 
       <H2>3. Tidak ada jaminan</H2>
@@ -194,21 +171,17 @@ export function TermsPage() {
 
       <H2>4. Batas tanggung jawab</H2>
       <P>
-        Sejauh diizinkan hukum, kami tidak bertanggung jawab atas kerugian yang timbul dari penggunaan
-        atau ketidakmampuan menggunakan situs, termasuk kehilangan dokumen atau penolakan dokumen
-        oleh pihak lain.
+        Hak pengguna dan tanggung jawab pengelola mengikuti hukum yang berlaku. Laporkan dugaan pelanggaran, penyalahgunaan, atau masalah keamanan melalui alamat kontak yang tercantum di Kebijakan Privasi.
       </P>
 
       <H2>5. Kekayaan intelektual</H2>
       <P>
-        Dokumen yang Anda proses tetap milik Anda. Kami tidak mengklaim hak apa pun atasnya. Kode dan
-        desain situs dilindungi hak cipta masing-masing pemegangnya.
+        Hak atas dokumen tetap pada pemegang haknya. Pastikan Anda memiliki izin untuk menyalin, mengubah, atau membagikan dokumen. Kode dan desain situs dilindungi hak cipta masing-masing pemegangnya.
       </P>
 
       <H2>6. Iklan</H2>
       <P>
-        Situs ini menampilkan iklan pihak ketiga untuk membiayai operasional. Iklan dipisahkan secara
-        visual dari antarmuka alat dan diberi label jelas.
+        Jika diaktifkan, iklan hanya ditampilkan di halaman katalog atau panduan dan diberi label “Iklan”.
       </P>
 
       <H2>7. Perubahan ketentuan</H2>
@@ -226,7 +199,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Apakah tanda tangan ini sah secara hukum?',
-    a: 'Untuk banyak keperluan sehari-hari, tanda tangan elektronik berbentuk gambar sudah diterima. Namun ini bukan tanda tangan digital tersertifikasi PSrE yang memiliki sertifikat dan jejak audit. Untuk dokumen yang mensyaratkan sertifikasi, gunakan penyelenggara resmi.',
+    a: 'PDFKit menempelkan gambar tanda tangan pada PDF. Penerimaan hasil bergantung pada syarat dokumen dan pihak penerima. Gunakan PSrE Indonesia yang diakui jika tanda tangan elektronik tersertifikasi disyaratkan.',
   },
   {
     q: 'Apakah saya perlu akun atau membayar?',
@@ -254,13 +227,13 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Apakah tanda tangan saya tersimpan?',
-    a: 'Gambar tanda tangan disimpan di penyimpanan perangkat agar bisa dipakai ulang. Anda bisa mematikannya kapan saja; data akan langsung dihapus dari perangkat.',
+    a: 'Secara default gambar tersedia selama tab aktif. Jika penyimpanan browser tersedia, Anda dapat mengaktifkannya sendiri. Unduh PNG untuk menyimpan salinan atau hapus salinan browser lewat Kebijakan Privasi.',
   },
   {
     q: 'Apakah situs ini memakai cookie?',
     a: consentNeeded()
-      ? 'Isi dokumen tidak. Cookie hanya dipakai iklan dan analitik pihak ketiga, dan itu pun setelah Anda memberi izin lewat notice yang muncul.'
-      : 'Tidak. Saat ini situs tidak memuat iklan, analitik, atau cookie pihak ketiga. Bila iklan diaktifkan nanti, notice persetujuan akan muncul lebih dulu.',
+      ? 'Layanan iklan dan analitik bersifat opsional. Pengaturannya tersedia melalui menu privasi, dan hosting GitHub Pages mencatat alamat IP untuk keamanan.'
+      : 'Analitik dan iklan opsional belum aktif pada konfigurasi ini. Hosting GitHub Pages tetap mencatat alamat IP untuk keamanan.',
   },
 ]
 

@@ -13,6 +13,8 @@ export type ToolSlug =
   | 'pdf-bisa-dicari'
   | 'susun-pdf'
   | 'sensor-pdf'
+  | 'workflow-pdf'
+  | 'bandingkan-pdf'
   | 'kompres-pdf'
   | 'putar-pdf'
   | 'watermark-pdf'
@@ -30,6 +32,12 @@ export type ToolMeta = {
 }
 
 export const TOOLS: ToolMeta[] = [
+  {
+    slug: 'workflow-pdf', name: 'Workflow PDF',
+    tagline: 'Gabung, OCR, putar, dan beri watermark dalam satu proses.',
+    description: 'Susun langkah untuk beberapa PDF, simpan preset di perangkat, dan unduh satu salinan hasil tanpa mengunggah dokumen.',
+    icon: 'workflow',
+  },
   {
     slug: 'gabung-pdf',
     name: 'Gabung PDF',
@@ -59,7 +67,7 @@ export const TOOLS: ToolMeta[] = [
     name: 'Foto ke PDF',
     tagline: 'Susun foto atau scan menjadi satu PDF.',
     description:
-      'Ubah beberapa foto JPG atau PNG menjadi satu berkas PDF yang rapi, dengan ukuran A4 atau mengikuti ukuran gambar.',
+      'Gabungkan foto seperti JPG, PNG, WebP, atau AVIF menjadi satu PDF berukuran A4 atau mengikuti ukuran gambar.',
     icon: 'images',
   },
   {
@@ -67,7 +75,7 @@ export const TOOLS: ToolMeta[] = [
     name: 'Foto ke Word',
     tagline: 'Susun beberapa foto menjadi satu Word yang bisa diedit.',
     description:
-      'Atur urutan foto JPG, PNG, atau WebP, koreksi hasil bacaan tiap halaman, lalu unduh satu dokumen Word (.docx).',
+      'Atur urutan foto seperti JPG, PNG, WebP, atau AVIF, koreksi hasil OCR, lalu unduh satu dokumen Word (.docx).',
     icon: 'form',
   },
   {
@@ -93,8 +101,14 @@ export const TOOLS: ToolMeta[] = [
     name: 'Kompres PDF',
     tagline: 'Perkecil ukuran file agar mudah dikirim.',
     description:
-      'Kurangi ukuran PDF dengan menurunkan resolusi dan kualitas gambar per halaman. Hasilnya berupa PDF gambar, bukan PDF berteks.',
+      'Kompres PDF ke target KB atau MB, optimalkan struktur untuk mempertahankan teks dan tautan, atau perkecil halaman dengan rasterisasi.',
     icon: 'gauge',
+  },
+  {
+    slug: 'bandingkan-pdf', name: 'Bandingkan PDF',
+    tagline: 'Lihat dua PDF berdampingan dan temukan halaman yang berubah.',
+    description: 'Bandingkan teks dan tampilan halaman pada dua versi PDF dengan pratinjau berdampingan dan pengguliran tersinkron.',
+    icon: 'compare',
   },
   {
     slug: 'putar-pdf',
@@ -123,9 +137,9 @@ export const TOOLS: ToolMeta[] = [
   {
     slug: 'tanda-tangan-massal',
     name: 'Tanda Tangan Massal',
-    tagline: 'Tempel satu tanda tangan ke banyak dokumen sekaligus.',
+    tagline: 'Tempel gambar tanda tangan dan paraf dengan template tersimpan.',
     description:
-      'Gunakan tanda tangan yang tersimpan untuk dibubuhkan pada banyak PDF sekaligus di posisi yang sama. Semua diproses di perangkat.',
+      'Atur posisi gambar tanda tangan dan paraf, simpan template, lalu lihat pratinjau sebelum memproses banyak PDF di perangkat Anda.',
     icon: 'layers',
   },
 ]
@@ -139,13 +153,33 @@ export type ArticleMeta = {
   readingMinutes: number
 }
 
+export const ARTICLES_INDEX = {
+  title: 'Panduan PDF dan tanda tangan dokumen',
+  description: 'Pelajari cara memilih alat PDF, mengolah hasil scan, membandingkan revisi, dan menyiapkan dokumen untuk ditandatangani.',
+}
+
 export const ARTICLES: ArticleMeta[] = [
+  {
+    slug: 'panduan-memilih-alat-pdf',
+    title: 'Panduan Memilih Alat PDF Sesuai Kebutuhan',
+    description: 'Pilih alat untuk menggabungkan, menyusun, mengonversi, menyensor, mengompres, membandingkan, atau menandatangani PDF langsung di browser.',
+    date: '2026-11-26',
+    readingMinutes: 4,
+  },
+  {
+    slug: 'workflow-pdf-dari-scan-sampai-siap-kirim',
+    title: 'Workflow PDF dari Hasil Scan sampai Siap Dikirim',
+    description: 'Gabungkan hasil scan, tambahkan OCR dan watermark, cek revisi, lalu kompres ke batas ukuran atau gunakan template tanda tangan massal.',
+    date: '2026-11-26',
+    readingMinutes: 5,
+  },
   {
     slug: 'cara-tanda-tangan-pdf-di-hp',
     title: 'Cara Tanda Tangan PDF di HP Tanpa Aplikasi Tambahan',
     description:
       'Langkah demi langkah menandatangani PDF dari HP Android atau iPhone lewat browser, tanpa memasang aplikasi dan tanpa mengunggah dokumen.',
     date: '2026-11-20',
+    updated: '2026-11-26',
     readingMinutes: 5,
   },
   {
@@ -154,7 +188,8 @@ export const ARTICLES: ArticleMeta[] = [
     description:
       'Penjelasan sederhana tentang tanda tangan elektronik, dasar hukumnya di Indonesia, dan kapan bentuk paling sederhana sudah cukup.',
     date: '2026-11-20',
-    readingMinutes: 6,
+    updated: '2026-11-26',
+    readingMinutes: 4,
   },
   {
     slug: 'beda-tanda-tangan-elektronik-dan-psre',
@@ -162,7 +197,8 @@ export const ARTICLES: ArticleMeta[] = [
     description:
       'Perbedaan tanda tangan elektronik gambar dengan tanda tangan digital bersertifikat, plus panduan memilih yang sesuai kebutuhan dokumen Anda.',
     date: '2026-11-20',
-    readingMinutes: 6,
+    updated: '2026-11-26',
+    readingMinutes: 4,
   },
   {
     slug: 'cara-tanda-tangan-di-word-simpan-pdf',
@@ -170,6 +206,7 @@ export const ARTICLES: ArticleMeta[] = [
     description:
       'Tiga cara menyisipkan tanda tangan di Microsoft Word, kelebihan dan kekurangannya, serta cara menyimpan hasilnya menjadi PDF yang rapi.',
     date: '2026-11-20',
+    updated: '2026-11-26',
     readingMinutes: 5,
   },
 ]
@@ -264,9 +301,7 @@ export function siteRoutes(): SiteRoute[] {
     },
     {
       path: '/artikel',
-      title: 'Artikel — panduan tanda tangan dokumen',
-      description:
-        'Panduan praktis seputar tanda tangan elektronik, keabsahan dokumen, dan cara menangani PDF di HP maupun komputer.',
+      ...ARTICLES_INDEX,
       priority: 0.8,
     },
   ]

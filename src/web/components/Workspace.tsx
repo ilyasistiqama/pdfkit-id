@@ -1,3 +1,5 @@
+import { consentNeeded } from '../../site/consent'
+import { OPEN_PRIVACY_SETTINGS } from '../../site/privacyPreferences'
 import { useRef, useState } from 'react'
 import {
   ChevronLeft,
@@ -17,6 +19,7 @@ import type { SignRect } from '../../core/geometry'
 import type { Placement, Signature } from '../../core/types'
 import { PdfViewer, type ViewerHandle } from './PdfViewer'
 import { SignatureStudio } from './SignatureStudio'
+import { SignedPdfNotice } from '../tools/SignedPdfNotice'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Modal } from './Modal'
 import { btnIcon, btnPrimary, card, cx, eyebrow } from '../ui'
@@ -30,6 +33,7 @@ const RELATED_TOOLS = TOOLS.filter((tool) =>
 interface Props {
   doc: PDFDocumentProxy
   fileName: string
+  bytes: Uint8Array | null
   zoom: number
   activePage: number
   onZoom: (zoom: number) => void
@@ -37,6 +41,8 @@ interface Props {
   signatures: Signature[]
   selectedSignatureId: string | null
   persistSignatures: boolean
+  canPersistSignatures: boolean
+  savedCopyNeedsReview: boolean
   onTogglePersist: (value: boolean) => void
   onSelectSignature: (id: string) => void
   onAddSignature: (image: SignatureImage) => void
@@ -83,13 +89,15 @@ export function Workspace(props: Props) {
         </div>
         <h2 className="mt-1 font-serif text-xl tracking-tight">Buat tanda tangan</h2>
         <p className="mt-1 mb-4 text-[0.82rem] leading-relaxed text-muted">
-          Gambar langsung, atau unggah PNG hasil scan. Bagian kosong otomatis dipangkas.
+          Gambar langsung, atau unggah foto tanda tangan. Bagian kosong otomatis dipangkas.
         </p>
         <SignatureStudio
           signatures={props.signatures}
           selectedId={props.selectedSignatureId}
           activePage={props.activePage + 1}
           persist={props.persistSignatures}
+          canPersist={props.canPersistSignatures}
+          savedCopyNeedsReview={props.savedCopyNeedsReview}
           onTogglePersist={props.onTogglePersist}
           onSelect={props.onSelectSignature}
           onAdd={props.onAddSignature}
@@ -178,6 +186,8 @@ export function Workspace(props: Props) {
         <p className="mt-2 text-center text-[0.68rem] leading-relaxed text-muted">
           Diproses di browser kamu. File tidak dikirim ke mana pun.
         </p>
+        {consentNeeded() && <button type="button" className="mt-2 w-full text-center text-xs text-gold hover:underline"
+          onClick={() => window.dispatchEvent(new Event(OPEN_PRIVACY_SETTINGS))}>Pengaturan privasi</button>}
         <div className="mt-3 border-t border-line pt-2.5">
           <p className="text-[0.68rem] font-semibold tracking-[0.12em] text-muted uppercase">
             Alat lain
@@ -302,6 +312,9 @@ export function Workspace(props: Props) {
         </div>
       </header>
 
+      <div className="mx-auto w-full max-w-[1440px] shrink-0 px-3 sm:px-8">
+        <SignedPdfNotice source={props.bytes} />
+      </div>
       <main className="mx-auto grid min-h-0 w-full max-w-[1440px] flex-1 gap-6 px-0 pb-24 sm:px-6 lg:grid-cols-[minmax(0,1fr)_384px] lg:px-8 lg:pb-6">
         <section className="min-h-0 overflow-hidden sm:rounded-[22px] sm:ring-1 sm:ring-line/60 lg:h-full">
           <PdfViewer

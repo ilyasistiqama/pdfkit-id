@@ -37,4 +37,4 @@ export const absolute = (path: string) => absoluteUrl(SITE_URL, path)
 export const CONTACT_EMAIL = 'ilyasistiqama@gmail.com'
 
 /** Tanggal terakhir konten situs diperbarui (dipakai sitemap). */
-export const CONTENT_UPDATED = '2026-11-20'
+export const CONTENT_UPDATED = '2026-11-26'

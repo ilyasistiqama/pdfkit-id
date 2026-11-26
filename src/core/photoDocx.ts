@@ -5,7 +5,7 @@ import {
   Paragraph, Tab, TabStopType, TextRun,
 } from 'docx'
 import { preparePhotoCanvas } from './photoCanvas'
-import { coversPhotoLine, readPhotoGraphic, type PhotoGraphic } from './photoGraphics'
+import { obscuresPhotoText, readPhotoGraphic, type PhotoGraphic } from './photoGraphics'
 import { editedPhotoLines, type PhotoLayout } from './photoLayout'
 
 const A4_WIDTH = 11906
@@ -51,6 +51,7 @@ async function imageRunsFor(source: PhotoSource | undefined, scale: number, x: n
           horizontalPosition: { relative: HorizontalPositionRelativeFrom.PAGE, offset: Math.round((x + x0 * scale) * 635) },
           verticalPosition: { relative: VerticalPositionRelativeFrom.PAGE, offset: Math.round((y + y0 * scale) * 635) },
           allowOverlap: true,
+          behindDocument: !!graphic.ink,
           wrap: { type: TextWrappingType.NONE },
         },
       })
@@ -88,8 +89,8 @@ async function editableSection(layout: PhotoLayout, draft: string, font: PhotoFo
     return { before, after: 0, line, lineRule: LineRuleType.EXACT }
   }
 
-  const lines = editedPhotoLines(layout.lines, draft).filter((line) => !source?.graphics.some((graphic) => coversPhotoLine(graphic, line)))
-  for (const [index, { bounds, baseline, text, tabStarts, underline }] of lines.entries()) {
+  const lines = editedPhotoLines(layout.lines, draft).filter((line) => !source?.graphics.some((graphic) => obscuresPhotoText(graphic, line)))
+  for (const [index, { bounds, baseline, text, tabStarts, tabEnds, underline }] of lines.entries()) {
     while (bounds && rules[ruleIndex]?.y1 < bounds.y0) {
       const rule = rules[ruleIndex++]
       paragraphs.push(new Paragraph({
@@ -105,7 +106,8 @@ async function editableSection(layout: PhotoLayout, draft: string, font: PhotoFo
       bounds.x0 >= layout.width * 0.18 &&
       Math.abs((bounds.x0 + bounds.x1) / 2 - layout.width / 2) <= layout.width * 0.045)
     const heading = Boolean(bounds && centered && /\p{Lu}{2}/u.test(text) && text === text.toUpperCase())
-    const bold = heading || height >= typicalHeight * 1.5
+    const signatureIntro = /^yang\s+bertanda\s*tangan\s+di\s*bawah\s+ini\b/i.test(text.trim())
+    const bold = heading || signatureIntro || height >= typicalHeight * 1.5
     const left = bounds ? Math.max(0, Math.min(usableWidth - 200, toX(bounds.x0))) : 0
     const chunks = text.split('	')
     const tabPositions = tabStarts?.slice(0, chunks.length - 1).map(toX) ?? []
@@ -120,7 +122,8 @@ async function editableSection(layout: PhotoLayout, draft: string, font: PhotoFo
       const segments = [left, ...tabPositions]
       const sizeByWidth = widths.map((width, index) => {
         const start = segments[index]
-        const end = segments[index + 1] ?? Math.min(usableWidth, toX(bounds.x1) + 40)
+        const photographedEnd = toX(tabEnds?.[index] ?? bounds.x1) + 40
+        const end = Math.min(segments[index + 1] ?? usableWidth, photographedEnd)
         return width > 1 && start !== undefined ? 2 * (end - start) / width : Infinity
       })
       const estimate = Math.min(...sizeByWidth)

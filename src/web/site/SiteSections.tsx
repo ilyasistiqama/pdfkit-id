@@ -1,7 +1,7 @@
 import { Link } from '../../router'
-import { ARTICLES, TOOLS } from '../../site/routes'
+import { ARTICLES, ARTICLES_INDEX, TOOLS } from '../../site/routes'
 import { AdSlot } from './AdSlot'
-import { cx, eyebrow } from '../ui'
+import { eyebrow } from '../ui'
 
 const Icon = ({ name }: { name: string }) => {
   const paths: Record<string, string> = {
@@ -16,6 +16,8 @@ const Icon = ({ name }: { name: string }) => {
     layers: 'M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5',
     search: 'M14 14l5 5M16 11a5 5 0 1 1-10 0 5 5 0 0 1 10 0z',
     redact: 'M4 5h16v14H4zM7 10h10v4H7z',
+    workflow: 'M4 4h6v6H4zM14 14h6v6h-6zM10 7h5a2 2 0 0 1 2 2v5',
+    compare: 'M3 5h7v14H3zM14 5h7v14h-7zM5 10h3M16 10h3M16 14h3',
   }
   return (
     <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -66,13 +68,11 @@ export function HomeExtras() {
         </ul>
       </section>
 
-      <AdSlot slot="content" className={cx('mx-auto mt-10 max-w-5xl px-0', 'z-0')} />
-
       <section className="mx-auto w-full max-w-5xl px-5 pt-16">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className={eyebrow}>Panduan</p>
-            <h2 className="mt-1 font-serif text-2xl tracking-tight">Bacaan singkat sebelum menandatangani</h2>
+            <h2 className="mt-1 font-serif text-2xl tracking-tight">Panduan mengolah PDF</h2>
           </div>
           <Link to="/artikel" className="text-sm font-medium text-gold hover:underline">
             Semua artikel
@@ -80,7 +80,7 @@ export function HomeExtras() {
         </div>
 
         <ul className="mt-5 grid gap-3 sm:grid-cols-2">
-          {ARTICLES.map((article) => (
+          {ARTICLES.slice(0, 4).map((article) => (
             <li key={article.slug}>
               <Link
                 to={`/artikel/${article.slug}`}
@@ -145,11 +145,10 @@ export function ArticlesIndex() {
     <div className="mx-auto w-full max-w-3xl px-5 pt-10 pb-4">
       <p className={eyebrow}>Panduan</p>
       <h1 className="mt-2 font-serif text-3xl leading-tight tracking-tight sm:text-4xl">
-        Artikel tentang tanda tangan dokumen
+        {ARTICLES_INDEX.title}
       </h1>
       <p className="mt-3 text-[0.95rem] leading-relaxed text-ink-soft">
-        Penjelasan praktis soal menandatangani PDF, keabsahan tanda tangan elektronik, dan cara
-        menangani dokumen di HP maupun komputer.
+        {ARTICLES_INDEX.description}
       </p>
 
       <ul className="mt-7 space-y-3">

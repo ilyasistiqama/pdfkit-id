@@ -1,20 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
-import { ADSENSE_CLIENT, SLOTS, adsConfigured, loadAdSense, type SlotName } from '../../site/ads'
-import { readConsent } from '../../site/consent'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { ADSENSE_CLIENT, SLOTS, adsConfigured, loadAdSense, readCmp, startCmp, subscribeCmp, type SlotName } from '../../site/ads'
+import { onConsentChange, readConsent } from '../../site/privacyPreferences'
 import { cx } from '../ui'
-
-/**
- * Slot iklan dengan tinggi yang dipesan sejak awal (mencegah layout bergeser),
- * label "Iklan" yang jelas, dan pemuatan lazy. Tidak memuat skrip apa pun
- * sebelum pengguna memberi izin, dan tidak menaruh iklan di dalam area dokumen
- * atau menempel pada tombol unduh.
- */
-
-const SIZES: Record<SlotName, { height: number; className: string }> = {
-  content: { height: 250, className: 'w-full' },
-  sidebar: { height: 600, className: 'w-full' },
-  anchor: { height: 100, className: 'w-full' },
-}
 
 interface Props {
   slot: SlotName
@@ -23,20 +10,34 @@ interface Props {
 }
 
 export function AdSlot({ slot, className }: Props) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [visible, setVisible] = useState(false)
-  const [ready, setReady] = useState(false)
-  const size = SIZES[slot]
   const slotId = SLOTS[slot]
-  const active = adsConfigured() && Boolean(slotId)
+  if (!adsConfigured() || !slotId) return null
+  return <ConfiguredAdSlot key={slotId} slotId={slotId} className={className} />
+}
+
+function ConfiguredAdSlot({ slotId, className }: { slotId: string; className?: string }) {
+  const marker = useRef<HTMLDivElement>(null)
+  const ad = useRef<HTMLModElement>(null)
+  const requestedAd = useRef<HTMLModElement>(null)
+  const [nearViewport, setNearViewport] = useState(false)
+  const [status, setStatus] = useState<'pending' | 'ready' | 'failed'>('pending')
+  const consent = useSyncExternalStore(onConsentChange, readConsent, () => null)
+  const cmpAllows = useSyncExternalStore(subscribeCmp, readCmp, () => false)
+  const allowed = consent?.ads === true && cmpAllows
+  useEffect(() => { if (consent?.ads) startCmp() }, [consent?.ads])
+  const showAdUnit = allowed && status === 'ready'
 
   useEffect(() => {
-    const node = ref.current
-    if (!node) return
+    const node = marker.current
+    if (!allowed || nearViewport || !node) return
+    if (typeof IntersectionObserver === 'undefined') {
+      setNearViewport(true)
+      return
+    }
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setVisible(true)
+          setNearViewport(true)
           observer.disconnect()
         }
       },
@@ -44,58 +45,49 @@ export function AdSlot({ slot, className }: Props) {
     )
     observer.observe(node)
     return () => observer.disconnect()
-  }, [])
+  }, [allowed, nearViewport])
 
   useEffect(() => {
-    if (!visible || !active) return
-    const mount = () => {
-      if (readConsent() !== 'granted') return
-      void loadAdSense().then(() => setReady(true))
+    if (!allowed || !nearViewport || status !== 'pending') return
+    let current = true
+    void loadAdSense().then((loaded) => {
+      if (current) setStatus(loaded ? 'ready' : 'failed')
+    })
+    return () => {
+      current = false
     }
-    mount()
-    window.addEventListener('ttd:consent', mount)
-    return () => window.removeEventListener('ttd:consent', mount)
-  }, [active, visible])
+  }, [allowed, nearViewport, status])
 
   useEffect(() => {
-    if (!ready || !active) return
+    const node = ad.current
+    if (!showAdUnit || !node || requestedAd.current === node || (!readConsent()?.ads || !readCmp())) return
+    requestedAd.current = node
     try {
       const ads = (window as unknown as { adsbygoogle?: unknown[] }).adsbygoogle
-      if (!ads) return
-      ads.push({})
+      if (ads) ads.push({})
+      else setStatus('failed')
     } catch {
-      /* iklan gagal dimuat: ruang berlabel tetap ada */
+      setStatus('failed')
     }
-  }, [ready, active])
+  }, [showAdUnit])
+
+  if (!allowed || status === 'failed') return null
+  if (!showAdUnit) return <div ref={marker} aria-hidden="true" />
 
   return (
-    <aside
-      ref={ref}
-      aria-label="Iklan"
-      className={cx('overflow-hidden rounded-2xl bg-surface/60 ring-1 ring-line/60', className)}
-      style={{ minHeight: size.height }}
-    >
-      <p className="border-b border-line/60 px-3 py-1.5 text-[0.6rem] font-semibold tracking-[0.16em] text-muted uppercase">
+    <aside aria-label="Iklan" className={cx('ad-slot', className)}>
+      <p className="ad-slot-label hidden border-b border-line/60 px-3 py-1.5 text-[0.6rem] font-semibold tracking-[0.16em] text-muted uppercase">
         Iklan
       </p>
-      <div className="grid place-items-center p-2" style={{ minHeight: size.height - 32 }}>
-        {active && ready ? (
-          <ins
-            className="adsbygoogle block w-full"
-            style={{ display: 'block' }}
-            data-ad-client={ADSENSE_CLIENT}
-            data-ad-slot={slotId}
-            data-ad-format="auto"
-            data-full-width-responsive="true"
-          />
-        ) : (
-          <p className="px-4 text-center text-[0.7rem] leading-relaxed text-muted/70">
-            {active
-              ? 'Ruang iklan. Tidak ada pelacakan sebelum Anda menyetujui cookie.'
-              : 'Ruang iklan.'}
-          </p>
-        )}
-      </div>
+      <ins
+        ref={ad}
+        className="adsbygoogle w-full"
+        style={{ display: 'block' }}
+        data-ad-client={ADSENSE_CLIENT}
+        data-ad-slot={slotId}
+        data-ad-format="auto"
+        data-full-width-responsive="true"
+      />
     </aside>
   )
 }

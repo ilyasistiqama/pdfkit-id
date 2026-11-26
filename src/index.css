@@ -108,6 +108,23 @@
   }
 }
 
+/* Unit harus bisa diukur AdSense saat meminta iklan. Bingkai muncul setelah terisi. */
+.ad-slot:not(:has(> .adsbygoogle[data-ad-status='filled'])) {
+  margin-block: 0;
+}
+
+.ad-slot:has(> .adsbygoogle:is([data-ad-status='unfilled'], [data-ad-status='unfill-optimized'])) {
+  display: none;
+}
+
+.ad-slot:has(> .adsbygoogle[data-ad-status='filled']) {
+  @apply overflow-hidden rounded-2xl bg-surface/60 ring-1 ring-line/60;
+}
+
+.ad-slot:has(> .adsbygoogle[data-ad-status='filled']) > .ad-slot-label {
+  display: block;
+}
+
 /* Latar kotak-kotak untuk melihat area transparan pada PNG */
 @utility checker {
   background-color: #fff;

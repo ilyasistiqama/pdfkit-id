@@ -264,6 +264,15 @@ try {
 
   const stored = async () => evaluate(`JSON.parse(localStorage.getItem('ttd-pdf:signatures') ?? 'null')`)
   await sleep(300)
+  check((await stored()) === null, 'gambar sementara sebelum pengguna memilih penyimpanan')
+  const optedIn = await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((item) => item.textContent.trim() === 'Simpan di browser')
+    if (!button) return false
+    button.click()
+    return true
+  })()`)
+  check(optedIn, 'penyimpanan browser bisa diaktifkan dengan pilihan pengguna')
+  await sleep(300)
   const firstStore = await stored()
   check(firstStore?.signatures?.length === 1, 'tanda tangan tersimpan di perangkat')
 

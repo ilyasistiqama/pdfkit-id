@@ -11,7 +11,7 @@ const STEPS = [
   {
     icon: ShieldCheck,
     title: 'Buat tanda tangan',
-    body: 'Gambar dengan mouse atau jari, atau unggah PNG hasil scan.',
+    body: 'Gambar dengan mouse atau jari, atau unggah foto tanda tangan.',
   },
   {
     icon: Download,

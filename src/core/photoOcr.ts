@@ -3,7 +3,7 @@ import workerUrl from 'tesseract.js/dist/worker.min.js?url'
 
 import { preparePhotoCanvas } from './photoCanvas'
 import { coversPhotoLine, findColorLogos, findPhotoGraphics } from './photoGraphics'
-import { findColorOverlay, identifyRules, identifyUnderlines, layoutRows, readOcrRow, reconcileRows, type PhotoLayout } from './photoLayout'
+import { findColorOverlay, identifyRules, identifyUnderlines, layoutRows, readOcrRow, reconcileRows, restoreFieldColons, type PhotoLayout } from './photoLayout'
 
 export type OcrLanguage = 'ind' | 'eng' | 'ind+eng'
 
@@ -89,19 +89,23 @@ async function readPage(worker: Worker, canvas: HTMLCanvasElement, rotateAuto: b
   return data
 }
 
-export async function readScanLines(worker: Worker, canvas: HTMLCanvasElement) {
+export async function readScanLines(worker: Worker, canvas: HTMLCanvasElement, skipWord?: (box: Bbox) => boolean) {
   const data = await readPage(worker, canvas, false)
   return readRows(data, canvas.width).flatMap((row) => {
-    const first = row.words[0]?.bbox
-    const last = row.words.at(-1)?.bbox
-    if (!first || !last) return []
-    return [{
-      text: row.words.map(({ text }) => text).join(' '),
-      x0: first.x0,
-      x1: last.x1,
-      baseline: Math.max(...row.words.map(({ bbox }) => bbox.y1)),
-      height: Math.max(...row.words.map(({ bbox }) => bbox.y1 - bbox.y0)),
-    }]
+    const groups: (typeof row.words)[] = [[]]
+    for (const word of row.words) {
+      const current = groups[groups.length - 1]
+      if (skipWord?.(word.bbox)) {
+        if (current.length) groups.push([])
+      } else current.push(word)
+    }
+    return groups.filter((words) => words.length).map((words) => ({
+      text: words.map(({ text }) => text).join(' '),
+      x0: Math.min(...words.map(({ bbox }) => bbox.x0)),
+      x1: Math.max(...words.map(({ bbox }) => bbox.x1)),
+      baseline: Math.max(...words.map(({ bbox }) => bbox.y1)),
+      height: Math.max(...words.map(({ bbox }) => bbox.y1 - bbox.y0)),
+    }))
   })
 }
 
@@ -126,7 +130,10 @@ export async function recognizePhotoInWorker(worker: Worker, url: string, rotati
       }
     }
     if (!lines.length) throw new Error('Teks belum terbaca. Coba foto yang lebih tajam, terang, dan tegak.')
-    if (pixels) identifyUnderlines(pixels, lines)
+    if (pixels) {
+      restoreFieldColons(pixels, lines)
+      identifyUnderlines(pixels, lines)
+    }
     const rules = pixels ? identifyRules(pixels, lines) : []
     const graphics = pixels ? findPhotoGraphics(pixels, lines, rules, color ?? null, logos) : []
     return { width, height, lines, rules, graphics }

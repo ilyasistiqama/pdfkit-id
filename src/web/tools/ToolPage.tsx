@@ -1,9 +1,18 @@
 import type { ToolMeta } from '../../site/routes'
 import { Link } from '../../router'
-import { AdSlot } from '../site/AdSlot'
 import { eyebrow } from '../ui'
 
 const STEPS: Record<string, string[]> = {
+  'workflow-pdf': [
+    'Pilih satu PDF atau urutkan beberapa PDF untuk digabung.',
+    'Atur langkah OCR, putar, atau watermark. Simpan pengaturan bila akan dipakai lagi.',
+    'Jalankan proses dan unduh satu PDF hasil akhir.',
+  ],
+  'bandingkan-pdf': [
+    'Pilih dua PDF sebagai versi awal dan versi revisi.',
+    'Bandingkan tampilan dan teks pada nomor halaman yang sama.',
+    'Lompat ke perubahan dan periksa kedua versi berdampingan.',
+  ],
   'gabung-pdf': [
     'Pilih dua berkas PDF atau lebih.',
     'Atur urutan dengan tombol panah pada daftar.',
@@ -20,12 +29,12 @@ const STEPS: Record<string, string[]> = {
     'Unduh semua gambar yang dihasilkan.',
   ],
   'foto-ke-pdf': [
-    'Pilih beberapa gambar JPG atau PNG.',
+    'Pilih beberapa foto dalam format yang didukung browser.',
     'Atur urutan dan ukuran halaman.',
     'Tekan “Buat PDF” lalu unduh hasilnya.',
   ],
   'foto-ke-word': [
-    'Pilih foto dokumen, lalu atur urutan dan arahnya.',
+    'Pilih foto dokumen dalam format yang didukung browser, lalu atur urutan dan arahnya.',
     'Baca teks otomatis, lalu koreksi sambil melihat foto.',
     'Unduh semua halaman sebagai satu dokumen Word.',
   ],
@@ -46,8 +55,8 @@ const STEPS: Record<string, string[]> = {
   ],
   'kompres-pdf': [
     'Pilih PDF yang ukurannya terlalu besar.',
-    'Pilih tingkat kompresi.',
-    'Bandingkan ukuran sebelum dan sesudah, lalu unduh.',
+    'Pilih metode kompresi dan tetapkan ukuran maksimum jika diperlukan.',
+    'Cek ukuran hasil dan pratinjau kualitas, lalu unduh salinannya.',
   ],
   'putar-pdf': [
     'Pilih PDF.',
@@ -66,8 +75,8 @@ const STEPS: Record<string, string[]> = {
   ],
   'tanda-tangan-massal': [
     'Pilih beberapa PDF sekaligus.',
-    'Pilih tanda tangan tersimpan dan atur posisinya.',
-    'Unduh semua dokumen yang sudah ditandatangani.',
+    'Atur gambar tanda tangan dan paraf. Simpan posisi dan keterangan sebagai template.',
+    'Lihat pratinjau, proses dokumen, lalu unduh salinannya.',
   ],
 }
 
@@ -97,7 +106,7 @@ export function ToolIntro({ tool }: { tool: ToolMeta }) {
   )
 }
 
-/** Penutup halaman: catatan privasi, tautan alat lain, dan slot iklan. */
+/** Penutup halaman berisi catatan privasi dan tautan ke alat lain. */
 export function ToolFooter({ tool }: { tool: ToolMeta }) {
   return (
     <div className="mx-auto w-full max-w-4xl px-5 pb-4">
@@ -105,8 +114,6 @@ export function ToolFooter({ tool }: { tool: ToolMeta }) {
         Berkas diproses di perangkat Anda dan tidak diunggah ke server. Menutup tab akan menghapusnya
         dari memori.
       </p>
-
-      <AdSlot slot="content" className="mt-8" />
 
       <section className="mt-8">
         <p className={eyebrow}>Alat lain</p>

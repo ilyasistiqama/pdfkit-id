@@ -32,6 +32,7 @@ document is uploaded to a server.
 
 | Tool | What it does |
 | --- | --- |
+| Workflow PDF | Run merge, OCR, rotation, and watermark in one pass, with local presets |
 | Gabung PDF | Merge several PDFs into one, order adjustable |
 | Pisah PDF | Extract ranges or split into one file per page |
 | PDF ke JPG | Render pages to JPG/PNG at selectable resolution |
@@ -40,13 +41,17 @@ document is uploaded to a server.
 | PDF Scan Bisa Dicari | Add searchable Indonesian/English OCR text to scanned PDF pages |
 | Susun Halaman PDF | Reorder, rotate, and remove pages with thumbnails |
 | Sensor PDF | Permanently cover selected regions and export a new image-only PDF |
-| Kompres PDF | Shrink by re-rasterising at lower resolution |
+| Kompres PDF | Set a maximum file size and preview the result, with a mode that retains text and links |
+| Bandingkan PDF | Review two versions side by side, with synced scrolling and change markers by page |
 | Putar PDF | Rotate all/odd/even pages by 90/180/270 |
 | Watermark PDF | Text watermark with color, size, opacity, diagonal |
 | Isi Formulir PDF | Fill AcroForm text/checkbox/choice fields |
-| Tanda Tangan Massal | Stamp one signature onto many PDFs at a fixed position |
+| Tanda Tangan Massal | Preview and apply signature images, initials, and captions to many PDFs with local templates |
 
 Multi-file results are delivered as a single ZIP (browsers block multiple automatic downloads).
+
+Photo inputs accept JPEG, PNG, WebP, AVIF, GIF, BMP, HEIC/HEIF, and TIFF when supported by the browser.
+Animated photos are treated as still images. Photo tools detect the input format from the file contents.
 
 ## SEO and content
 
@@ -57,18 +62,18 @@ The site is a static multi-page build, not a single-page app:
 - Per-route `<title>`, description, canonical, Open Graph, Twitter card, and JSON-LD
   (`SoftwareApplication`, `Article`, `FAQPage`).
 - `sitemap.xml`, `robots.txt`, `ads.txt`, and `404.html` are generated on build.
-- Content pages: Tentang, Kontak (via email), Privasi, Syarat, FAQ, plus four long-form articles.
+- Content pages: Tentang, Kontak (via email), Privasi, Syarat, FAQ, plus articles on PDF workflows and signing.
 - Client-side navigation uses the History API with trailing-slash URLs, matching GitHub Pages.
 
 ## Monetisation
 
 Ads are built in but disabled until configured:
 
-- `AdSlot` reserves height, lazy-loads, is labelled "Iklan", and never sits inside the document area
-  or next to the download button.
+- `AdSlot` lazy-loads and shows the "Iklan" frame only when AdSense fills the slot. Empty or
+  unconfigured placements leave no gap. Ads sit outside the document area and away from download buttons.
 - No ad or analytics script loads before the visitor accepts the cookie notice.
-- Set `VITE_ADSENSE_CLIENT` and the `VITE_ADSENSE_SLOT_*` variables at build time to enable them;
-  `ads.txt` is then generated from the publisher id.
+- Configure the publisher, slot IDs, and a certified CMP. Ads are restricted to the tool directory and guides.
+  `ads.txt` is generated from the publisher ID.
 
 ## Tech stack
 
@@ -103,7 +108,9 @@ All optional; the site works without them.
 | --- | --- |
 | `BASE_PATH` | Sub-path for project pages, e.g. `/ttd-pdf/` |
 | `VITE_SITE_URL` | Absolute site URL; enables canonical, OG URLs, and `sitemap.xml` |
-| `VITE_ADSENSE_CLIENT` | `ca-pub-...`; enables ad slots and `ads.txt` |
+| `VITE_ADSENSE_CLIENT` | Public publisher ID; generates `ads.txt` |
+| `VITE_ADSENSE_CMP_SCRIPT` | HTTPS script URL for the certified TCF CMP |
+| `VITE_SIGNATURE_STORAGE_ORIGIN` | Exact HTTPS origin dedicated to PDFKit for optional browser storage |
 | `VITE_ADSENSE_SLOT_CONTENT` / `_SIDEBAR` / `_ANCHOR` | Ad unit ids per placement |
 | `VITE_ANALYTICS_SCRIPT` | GA4/Plausible/Umami script URL (loaded only after consent) |
 | `VITE_ANALYTICS_DOMAIN` | Measurement id or domain for the analytics provider |

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { mergePdfs } from '../../core/pdfOps'
 import { downloadBlob, pdfBlob } from '../../core/download'
 import { trackDownload } from '../../site/analytics'
+import { confirmSignedPdfChange, SignedPdfNotice } from './SignedPdfNotice'
 import { ActionButton, DropZone, Field, FileList, Status, ToolBody, inputClass } from './ToolUi'
 
 export function MergeTool() {
@@ -25,6 +26,7 @@ export function MergeTool() {
     setError('')
     setDone('')
     try {
+      if (!await confirmSignedPdfChange(files)) return
       const bytes = await mergePdfs(files, 'Gabungan PDF')
       downloadBlob(pdfBlob(bytes), 'gabungan.pdf')
       trackDownload('gabung-pdf')
@@ -46,6 +48,7 @@ export function MergeTool() {
         hint="Tambahkan dua berkas atau lebih"
       />
 
+      <SignedPdfNotice source={files} />
       <FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} onMove={move} />
 
       {error && <Status tone="error">{error}</Status>}
@@ -95,6 +98,7 @@ export function RotateTool() {
     setBusy(true)
     setError('')
     try {
+      if (!await confirmSignedPdfChange(file)) return
       const { rotatePdf, baseName } = await import('../../core/pdfOps')
       const bytes = new Uint8Array(await file.arrayBuffer())
       const output = await rotatePdf(bytes, angle, { pages })
@@ -117,6 +121,8 @@ export function RotateTool() {
             <p className="text-sm font-medium text-ink">{file.name}</p>
             <p className="text-[0.72rem] text-muted">{pageCount} halaman</p>
           </div>
+
+          <SignedPdfNotice source={file} />
 
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Sudut putar">
@@ -200,6 +206,7 @@ export function WatermarkTool() {
     setBusy(true)
     setError('')
     try {
+      if (!await confirmSignedPdfChange(file)) return
       const { watermarkPdf, baseName } = await import('../../core/pdfOps')
       const output = await watermarkPdf(
         new Uint8Array(await file.arrayBuffer()),
@@ -223,6 +230,8 @@ export function WatermarkTool() {
           <div className="rounded-2xl bg-surface p-4 ring-1 ring-line/70">
             <p className="text-sm font-medium text-ink">{file.name}</p>
           </div>
+
+          <SignedPdfNotice source={file} />
 
           <Field label="Teks watermark">
             <input value={text} onChange={(event) => setText(event.target.value)} className={inputClass} maxLength={40} />

@@ -1,83 +1,57 @@
-import { useEffect, useState } from 'react'
-import { Cookie } from 'lucide-react'
-import { enableAnalytics } from '../../site/analytics'
-import { loadAdSense } from '../../site/ads'
-import { consentNeeded, readConsent, writeConsent, type Consent } from '../../site/consent'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { advertisingStarted, adsConfigured } from '../../site/ads'
+import { analyticsReady, enableAnalytics, stopAnalytics } from '../../site/analytics'
+import { noConsent, onConsentChange, OPEN_PRIVACY_SETTINGS, readConsent, writeConsent, type Consent } from '../../site/privacyPreferences'
+import { consentNeeded } from '../../site/consent'
 import { Link } from '../../router'
-import { btnPrimary, cx } from '../ui'
+import { btnPrimary } from '../ui'
 
-/**
- * Notice persetujuan cookie pihak ketiga. Isi dokumen tetap di perangkat apa pun
- * pilihannya; notice ini hanya mengatur skrip iklan dan analitik.
- *
- * Pilihan disimpan di perangkat dan dibaca setelah mount: HTML hasil prerender
- * tidak pernah memuat notice, sehingga pengunjung yang sudah memilih tidak
- * melihatnya berkedip dan hidrasi tidak bentrok.
- */
 export function ConsentNotice() {
-  const [consent, setConsent] = useState<Consent | 'unknown'>('unknown')
+  const consent = useSyncExternalStore(onConsentChange, readConsent, () => null)
+  const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)
+  const [choice, setChoice] = useState(noConsent)
 
   useEffect(() => {
-    setConsent(readConsent())
+    setMounted(true)
+    const show = () => { setChoice(readConsent() ?? noConsent); setOpen(true) }
+    window.addEventListener(OPEN_PRIVACY_SETTINGS, show)
+    return () => window.removeEventListener(OPEN_PRIVACY_SETTINGS, show)
   }, [])
 
   useEffect(() => {
-    const show = () => setOpen(true)
-    window.addEventListener('ttd:open-cookie-settings', show)
-    return () => window.removeEventListener('ttd:open-cookie-settings', show)
-  }, [])
-
-  useEffect(() => {
-    if (consent !== 'granted') return
-    enableAnalytics()
-    void loadAdSense()
+    if (consent?.analytics) enableAnalytics()
+    else stopAnalytics()
+    if (!consent?.ads && advertisingStarted()) window.location.reload()
   }, [consent])
 
-  const decide = (value: Exclude<Consent, null>) => {
-    writeConsent(value)
-    setConsent(value)
+  const decide = (value: Consent) => {
+    writeConsent({ analytics: analyticsReady() && value.analytics, ads: adsConfigured() && value.ads })
     setOpen(false)
   }
 
-  if (!consentNeeded()) return null
-  if (consent === 'unknown') return null
-  if (consent && !open) return null
+  if (!mounted || !consentNeeded() || (consent && !open)) return null
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-      <div className="mx-auto w-full max-w-3xl rounded-2xl bg-surface p-4 shadow-[0_-10px_40px_-20px_rgb(0_0_0/0.35)] ring-1 ring-line">
-        <div className="flex items-start gap-3">
-          <Cookie className="mt-0.5 size-4 shrink-0 text-gold" strokeWidth={1.8} />
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-ink">Iklan memakai cookie</p>
-            <p className="mt-1 text-[0.8rem] leading-relaxed text-muted">
-              Dokumen Anda tidak pernah diunggah. Namun iklan dan analitik pihak ketiga memakai
-              cookie untuk mengukur tayangan. Anda bisa menolak dan situs tetap berfungsi penuh.{' '}
-              <Link to="/privasi" className="font-medium text-gold underline-offset-2 hover:underline">
-                Kebijakan privasi
-              </Link>
-              .
-            </p>
-          </div>
-        </div>
-        <div className="mt-3 flex gap-2">
-          <button
-            type="button"
-            onClick={() => decide('denied')}
-            className="h-10 flex-1 rounded-xl text-sm font-medium text-ink-soft ring-1 ring-line transition hover:bg-sunken"
-          >
-            Tolak iklan personal
-          </button>
-          <button
-            type="button"
-            onClick={() => decide('granted')}
-            className={cx(btnPrimary, 'h-10 flex-1 text-sm')}
-          >
-            Setuju
-          </button>
+    <section aria-label="Pilihan privasi" className="fixed inset-x-0 bottom-0 z-50 px-3 pb-3">
+      <div className="mx-auto max-w-2xl space-y-3 rounded-2xl bg-surface p-4 shadow-xl ring-1 ring-line">
+        <h2 className="text-sm font-medium text-ink">Pilihan privasi</h2>
+        <p className="text-xs text-muted">Analitik dan iklan bersifat opsional. Alat tetap dapat digunakan. <Link to="/privasi" className="text-gold hover:underline">Kebijakan Privasi</Link></p>
+        {analyticsReady() && <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={choice.analytics} onChange={(event) => setChoice({ ...choice, analytics: event.target.checked })} />
+          Izinkan statistik penggunaan alat
+        </label>}
+        {adsConfigured() && <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={choice.ads} onChange={(event) => setChoice({ ...choice, ads: event.target.checked })} />
+          Izinkan layanan iklan di halaman panduan
+        </label>}
+        {consent?.ads && advertisingStarted() && <p className="text-xs text-muted">Halaman panduan dimuat ulang jika izin iklan dicabut.</p>}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="flex-1 rounded-xl px-3 py-2 text-sm ring-1 ring-line" onClick={() => decide(noConsent)}>Tolak semua</button>
+          <button type="button" className={`${btnPrimary} flex-1`} onClick={() => decide(choice)}>Simpan pilihan</button>
+          {open && consent && <button type="button" className="px-3 text-sm text-muted" onClick={() => setOpen(false)}>Tutup</button>}
         </div>
       </div>
-    </div>
+    </section>
   )
 }

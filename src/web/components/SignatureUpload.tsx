@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ImageUp, Loader2 } from 'lucide-react'
 import { fileToSignature } from '../../core/image'
 import type { SignatureImage } from '../../core/image'
+import { PHOTO_ACCEPT } from '../../core/photoInput'
 import { cx } from '../ui'
 
 interface Props {
@@ -16,32 +17,31 @@ export function SignatureUpload({ onSave, busy }: Props) {
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState('')
   const [over, setOver] = useState(false)
+  const request = useRef(0)
 
   const process = async (nextFile: File, drop: boolean) => {
+    const job = ++request.current
     setProcessing(true)
+    setPreview(null)
     setError('')
     try {
       const image = await fileToSignature(nextFile, drop)
+      if (request.current !== job) return
       if (!image) {
         setPreview(null)
         setError('Gambarnya kosong. Coba file lain atau matikan "Hapus latar putih".')
       } else {
         setPreview(image)
       }
-    } catch {
-      setPreview(null)
-      setError('File ini tidak bisa dibaca sebagai gambar.')
+    } catch (error) {
+      if (request.current === job) setError(error instanceof Error ? error.message : 'Gambar gagal dibaca.')
     } finally {
-      setProcessing(false)
+      if (request.current === job) setProcessing(false)
     }
   }
 
   const accept = (nextFile: File | undefined) => {
     if (!nextFile) return
-    if (!nextFile.type.startsWith('image/')) {
-      setError('Pilih file PNG atau JPG.')
-      return
-    }
     setFile(nextFile)
     void process(nextFile, dropBackground)
   }
@@ -72,7 +72,7 @@ export function SignatureUpload({ onSave, busy }: Props) {
       >
         <input
           type="file"
-          accept="image/png,image/jpeg"
+          accept={PHOTO_ACCEPT}
           className="hidden"
           onChange={(e) => {
             accept(e.target.files?.[0])
@@ -85,7 +85,7 @@ export function SignatureUpload({ onSave, busy }: Props) {
           <ImageUp className="size-5 text-muted" strokeWidth={1.6} />
         )}
         <span className="text-sm font-medium text-ink-soft">Pilih gambar tanda tangan</span>
-        <span className="text-xs text-muted">PNG transparan paling bagus, JPG juga bisa</span>
+        <span className="text-xs text-muted">PNG transparan atau foto dari perangkat</span>
       </label>
 
       <button

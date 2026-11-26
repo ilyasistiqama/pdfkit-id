@@ -1,21 +1,38 @@
 import {
   degrees,
+  concatTransformationMatrix,
+  pushGraphicsState,
+  popGraphicsState,
   PDFCheckBox,
+  PDFArray,
+  PDFDict,
   PDFDocument,
   PDFDropdown,
   PDFOptionList,
+  PDFName,
+  PDFNull,
+  PDFObjectCopier,
+  PDFPageLeaf,
+  PDFRef,
   PDFRadioGroup,
   PDFTextField,
   StandardFonts,
   rgb,
-  type PDFPage,
+  PDFPage,
 } from 'pdf-lib'
 import { normalizeRotation, visibleBox, visualSize, type Box } from './geometry'
+import { imageOrientationMatrix, jpegOrientation } from './jpegOrientation'
+import { detectPhotoType, unknownPhotoError, withPhotoImage } from './photoInput'
+import { canvasPng } from './pdfCanvas'
 
 export type NamedBytes = { name: string; bytes: Uint8Array }
 
 const PRODUCER = 'Tanda Tangan PDF'
 const readBytes = async (file: File) => new Uint8Array(await file.arrayBuffer())
+const annotationKeys = {
+  annots: PDFName.of('Annots'), destination: PDFName.of('Dest'), action: PDFName.of('A'),
+  kind: PDFName.of('S'), target: PDFName.of('D'), goto: PDFName.of('GoTo'),
+}
 
 const finish = (doc: PDFDocument, title?: string) => {
   if (title) doc.setTitle(title)
@@ -25,12 +42,49 @@ const finish = (doc: PDFDocument, title?: string) => {
   return doc.save()
 }
 
+/** Use the same copied reference for a kept page and for links that target it. */
+function copySelectedPages(source: PDFDocument, output: PDFDocument, indices: number[]) {
+  const pages = source.getPages()
+  const selected = new Set(indices)
+  const omitted = pages.filter((_, index) => !selected.has(index))
+  const copier = PDFObjectCopier.for(source.context, output.context)
+
+  // Destination and annotation refs must not pull omitted page objects into the result.
+  for (const page of omitted) source.context.assign(page.ref, PDFNull)
+  try {
+    return indices.map((index) => {
+      const ref = copier.copy(pages[index].ref)
+      const leaf = output.context.lookup(ref)
+      if (!(leaf instanceof PDFPageLeaf)) throw new Error('Halaman PDF tidak bisa disalin.')
+      const { annots, destination, action, kind, target, goto } = annotationKeys
+      const annotations = leaf.lookup(annots)
+      for (const entry of annotations instanceof PDFArray ? annotations.asArray() : []) {
+        const annotation = output.context.lookup(entry)
+        if (!(annotation instanceof PDFDict)) continue
+        const linkAction = annotation.lookup(action)
+        const explicit = annotation.lookup(destination)
+        const actionDestination = linkAction instanceof PDFDict && linkAction.get(kind) === goto
+          ? linkAction.lookup(target) : undefined
+        for (const [key, value] of [[destination, explicit], [action, actionDestination]] as const) {
+          const pageRef = value instanceof PDFArray && value.get(0)
+          if (pageRef === PDFNull || (pageRef instanceof PDFRef && output.context.lookup(pageRef) === PDFNull)) {
+            annotation.delete(key)
+          }
+        }
+      }
+      return PDFPage.of(leaf, ref, output)
+    })
+  } finally {
+    for (const page of omitted) source.context.assign(page.ref, page.node)
+  }
+}
+
 /** Urutan masukan = urutan halaman pada hasil. */
 export async function mergePdfs(files: File[], title?: string): Promise<Uint8Array> {
   const output = await PDFDocument.create()
   for (const file of files) {
     const source = await PDFDocument.load(await readBytes(file), { updateMetadata: false })
-    const pages = await output.copyPages(source, source.getPageIndices())
+    const pages = copySelectedPages(source, output, source.getPageIndices())
     for (const page of pages) output.addPage(page)
   }
   return finish(output, title)
@@ -71,7 +125,7 @@ export async function splitPdf(
 
   const build = async (indices: number[], label: string) => {
     const doc = await PDFDocument.create()
-    const pages = await doc.copyPages(source, indices)
+    const pages = copySelectedPages(source, doc, indices)
     for (const page of pages) doc.addPage(page)
     const data = await finish(doc, label)
     outputs.push({ name: `${baseName}-${label}.pdf`, bytes: data })
@@ -207,10 +261,6 @@ export async function watermarkPdf(
   return finish(doc)
 }
 
-const isPng = (file: File) => /png$/i.test(file.type) || /\.png$/i.test(file.name)
-const isJpeg = (file: File) =>
-  /jpe?g$/i.test(file.type) || /\.jpe?g$/i.test(file.name)
-
 export type ImagesToPdfOptions = {
   /** 'a4' memuat gambar utuh di halaman A4, 'auto' mengikuti ukuran tiap gambar */
   layout: 'a4' | 'auto'
@@ -219,7 +269,7 @@ export type ImagesToPdfOptions = {
 
 const A4 = { w: 595.28, h: 841.89 }
 
-/** JPG/PNG → PDF, satu gambar per halaman. */
+/** Foto raster → PDF, satu gambar per halaman. */
 export async function imagesToPdf(
   files: File[],
   options: ImagesToPdfOptions,
@@ -228,27 +278,55 @@ export async function imagesToPdf(
   const doc = await PDFDocument.create()
 
   for (const file of files) {
-    const bytes = await readBytes(file)
-    let image
-    if (isPng(file)) image = await doc.embedPng(bytes)
-    else if (isJpeg(file)) image = await doc.embedJpg(bytes)
-    else throw new Error(`Format ${file.name} tidak didukung. Gunakan JPG atau PNG.`)
+    let asset
+    try {
+      const bytes = await readBytes(file)
+      const type = detectPhotoType(bytes)
+      if (!type) throw unknownPhotoError()
+      if (type === 'image/jpeg') asset = { image: await doc.embedJpg(bytes), orientation: jpegOrientation(bytes) }
+      else if (type === 'image/png') asset = { image: await doc.embedPng(bytes), orientation: 1 }
+      else {
+        const data = await withPhotoImage(file.slice(0, file.size, type), async (photo) => {
+          const canvas = document.createElement('canvas')
+          canvas.width = photo.naturalWidth
+          canvas.height = photo.naturalHeight
+          try {
+            const context = canvas.getContext('2d')
+            if (!context) throw new Error('Browser tidak bisa memproses gambar ini.')
+            context.drawImage(photo, 0, 0)
+            return await canvasPng(canvas)
+          } finally {
+            canvas.width = 0
+            canvas.height = 0
+          }
+        })
+        asset = { image: await doc.embedPng(data), orientation: 1 }
+      }
+    } catch (error) {
+      throw new Error(`Foto “${file.name}” gagal diproses. ${error instanceof Error ? error.message : ''}`.trim(), { cause: error })
+    }
+    const { image, orientation } = asset
+    const swapped = orientation >= 5
+    const imageW = swapped ? image.height : image.width
+    const imageH = swapped ? image.width : image.height
 
     const pageSize =
-      options.layout === 'a4' ? A4 : { w: image.width + options.margin * 2, h: image.height + options.margin * 2 }
+      options.layout === 'a4' ? A4 : { w: imageW + options.margin * 2, h: imageH + options.margin * 2 }
     const page = doc.addPage([pageSize.w, pageSize.h])
     const maxW = pageSize.w - options.margin * 2
     const maxH = pageSize.h - options.margin * 2
-    const scale = Math.min(maxW / image.width, maxH / image.height)
-    const drawW = image.width * scale
-    const drawH = image.height * scale
-
+    const scale = Math.min(maxW / imageW, maxH / imageH)
+    const drawW = imageW * scale
+    const drawH = imageH * scale
+    const [a, b, c, d, x, y] = imageOrientationMatrix(orientation, drawW, drawH)
+    page.pushOperators(pushGraphicsState(), concatTransformationMatrix(a, b, c, d,
+      x + (pageSize.w - drawW) / 2, y + (pageSize.h - drawH) / 2))
     page.drawImage(image, {
-      x: (pageSize.w - drawW) / 2,
-      y: (pageSize.h - drawH) / 2,
-      width: drawW,
-      height: drawH,
+      x: 0, y: 0,
+      width: image.width * scale,
+      height: image.height * scale,
     })
+    page.pushOperators(popGraphicsState())
   }
 
   return finish(doc, title)
@@ -259,6 +337,9 @@ export type FormField =
   | { kind: 'checkbox'; name: string; checked: boolean }
   | { kind: 'radio'; name: string; value: string | null; options: string[] }
   | { kind: 'dropdown'; name: string; value: string | null; options: string[] }
+  | { kind: 'multiselect'; name: string; value: string[]; options: string[] }
+
+export type FormValue = string | boolean | string[]
 
 /** Kolom formulir yang bisa diisi (teks, centang, pilihan). */
 export async function readFormFields(bytes: Uint8Array): Promise<FormField[]> {
@@ -267,6 +348,7 @@ export async function readFormFields(bytes: Uint8Array): Promise<FormField[]> {
   const fields: FormField[] = []
 
   for (const field of form.getFields()) {
+    if (field.isReadOnly()) continue
     const name = field.getName()
     try {
       if (field instanceof PDFTextField) {
@@ -281,12 +363,11 @@ export async function readFormFields(bytes: Uint8Array): Promise<FormField[]> {
           options: field.getOptions(),
         })
       } else if (field instanceof PDFDropdown || field instanceof PDFOptionList) {
-        fields.push({
-          kind: 'dropdown',
-          name,
-          value: field.getSelected()[0] ?? null,
-          options: field.getOptions(),
-        })
+        const options = field.getOptions()
+        const selected = field.getSelected()
+        fields.push(field.isMultiselect()
+          ? { kind: 'multiselect', name, value: selected, options }
+          : { kind: 'dropdown', name, value: selected[0] ?? null, options })
       }
     } catch {
       /* kolom yang tidak didukung dilewati */
@@ -296,28 +377,38 @@ export async function readFormFields(bytes: Uint8Array): Promise<FormField[]> {
   return fields
 }
 
-/** Isi kolom formulir sesuai nilai baru, lalu ratakan agar tampil di penampil mana pun. */
+/** Isi kolom yang dapat diedit dan perbarui tampilannya untuk penampil PDF. */
 export async function fillFormPdf(
   bytes: Uint8Array,
-  values: Record<string, string | boolean>,
+  values: Record<string, FormValue>,
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.load(bytes, { updateMetadata: false })
   const form = doc.getForm()
 
   for (const field of form.getFields()) {
     const name = field.getName()
-    if (!(name in values)) continue
+    if (!Object.hasOwn(values, name) || field.isReadOnly()) continue
     const value = values[name]
     try {
       if (field instanceof PDFTextField && typeof value === 'string') {
-        field.setText(value)
+        if ((field.getText() ?? '') !== value) field.setText(value)
       } else if (field instanceof PDFCheckBox && typeof value === 'boolean') {
-        value ? field.check() : field.uncheck()
-      } else if ((field instanceof PDFRadioGroup || field instanceof PDFDropdown || field instanceof PDFOptionList) && typeof value === 'string') {
-        field.select(value)
+        if (field.isChecked() !== value) value ? field.check() : field.uncheck()
+      } else if (field instanceof PDFRadioGroup && typeof value === 'string') {
+        if ((field.getSelected() ?? '') !== value) value ? field.select(value) : field.clear()
+      } else if (field instanceof PDFDropdown || field instanceof PDFOptionList) {
+        const selected = Array.isArray(value) && field.isMultiselect() ? value
+          : typeof value === 'string' ? (value ? [value] : []) : null
+        if (!selected) throw new Error('Daftar pilihan tidak sesuai.')
+        const previous = field.getSelected()
+        if (selected.length !== previous.length || selected.some((item) => !previous.includes(item))) {
+          selected.length ? field.select(selected) : field.clear()
+        }
+      } else {
+        throw new Error('Jenis nilai tidak sesuai.')
       }
-    } catch {
-      /* nilai tidak cocok untuk kolom ini, biarkan apa adanya */
+    } catch (error) {
+      throw new Error(`Isian pada kolom “${name}” belum bisa disimpan. Periksa format, panjang, dan pilihan yang tersedia.`, { cause: error })
     }
   }
 
@@ -330,10 +421,12 @@ export const baseName = (name: string) => name.replace(/\.pdf$/i, '')
 
 /** Pastikan nama unik: tambah -2, -3, dst. */
 export function uniqueName(name: string, used: Set<string>) {
+  const extension = /\.[a-z0-9]+$/i.exec(name)
+  const stem = extension ? name.slice(0, extension.index) : name
   let candidate = name
   let counter = 2
   while (used.has(candidate)) {
-    candidate = name.replace(/(\.[a-z0-9]+)$/i, `-${counter}$1`)
+    candidate = `${stem}-${counter}${extension?.[0] ?? ''}`
     counter++
   }
   used.add(candidate)
@@ -353,7 +446,7 @@ export async function organizePdf(bytes: Uint8Array, arrangement: PageArrangemen
   const output = keepAll ? source : await PDFDocument.create()
   const pages = keepAll
     ? arrangement.map(({ index }) => original[index])
-    : await output.copyPages(source, arrangement.map(({ index }) => index))
+    : copySelectedPages(source, output, arrangement.map(({ index }) => index))
   if (keepAll) {
     for (let index = original.length - 1; index >= 0; index--) output.removePage(index)
   }

@@ -8,7 +8,8 @@ import { Landing } from '../components/Landing'
 import { Workspace } from '../components/Workspace'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Modal } from '../components/Modal'
-import { loadSignatures, saveSignatures } from '../signatureStore'
+import { canPersistSensitiveData, clearBrowserCopy, loadSignatures, saveSignatures, SIGNATURE_STORAGE_KEY } from '../signatureStore'
+import { confirmSignedPdfChange } from '../tools/SignedPdfNotice'
 import { useHistory } from '../useHistory'
 import { btnGhost, btnPrimary, cx } from '../ui'
 import { trackDownload } from '../../site/analytics'
@@ -39,6 +40,7 @@ export default function SignWorkspace({ onImmersiveChange }: Props) {
 
   const [signatures, setSignatures] = useState<Signature[]>(stored.signatures)
   const [persistSignatures, setPersistSignatures] = useState(stored.enabled)
+  const [savedCopyNeedsReview, setSavedCopyNeedsReview] = useState(stored.needsReview)
   const [selectedSignatureId, setSelectedSignatureId] = useState<string | null>(
     stored.signatures.at(-1)?.id ?? null,
   )
@@ -80,14 +82,41 @@ export default function SignWorkspace({ onImmersiveChange }: Props) {
     return () => window.clearTimeout(timer)
   }, [notice])
 
-  // Simpan tanda tangan di perangkat (opt-out lewat tombol "Tersimpan").
   useEffect(() => {
     const ok = saveSignatures(persistSignatures, signatures)
     if (!ok && persistSignatures) {
       setPersistSignatures(false)
-      setNotice('Penyimpanan perangkat penuh. Tanda tangan tidak disimpan permanen.')
+      setNotice('Penyimpanan browser gagal. Gambar tetap tersedia di tab ini.')
+    } else if (persistSignatures) {
+      setSavedCopyNeedsReview(false)
     }
   }, [signatures, persistSignatures])
+
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if ((event.key === SIGNATURE_STORAGE_KEY || event.key === null) && event.newValue === null) {
+        setPersistSignatures(false)
+        setSavedCopyNeedsReview(false)
+      }
+    }
+    window.addEventListener('storage', sync)
+    return () => window.removeEventListener('storage', sync)
+  }, [])
+
+  const togglePersistence = (enabled: boolean) => {
+    if (enabled) {
+      if (canPersistSensitiveData()) setPersistSignatures(true)
+      return
+    }
+    if (clearBrowserCopy(SIGNATURE_STORAGE_KEY)) {
+      setPersistSignatures(false)
+      setSavedCopyNeedsReview(false)
+    } else {
+      setPersistSignatures(false)
+      setSavedCopyNeedsReview(true)
+      setNotice('Salinan tersimpan belum bisa dihapus. Coba lagi dari pengaturan browser.')
+    }
+  }
 
   const askPassword = useCallback(
     (retry: boolean) =>
@@ -258,6 +287,7 @@ export default function SignWorkspace({ onImmersiveChange }: Props) {
     if (!bytes || !placements.length) return
     setExporting(true)
     try {
+      if (!await confirmSignedPdfChange(bytes)) return
       const { signPdf } = await import('../../core/exportPdf')
       const output = await signPdf(
         bytes,
@@ -362,6 +392,7 @@ export default function SignWorkspace({ onImmersiveChange }: Props) {
         <Workspace
           doc={doc}
           fileName={fileName}
+          bytes={bytes}
           zoom={zoom}
           activePage={activePage}
           onZoom={(next) => setZoom(Math.max(0.5, Math.min(2.4, Number(next.toFixed(2)))))}
@@ -369,7 +400,9 @@ export default function SignWorkspace({ onImmersiveChange }: Props) {
           signatures={signatures}
           selectedSignatureId={selectedSignatureId}
           persistSignatures={persistSignatures}
-          onTogglePersist={setPersistSignatures}
+          canPersistSignatures={canPersistSensitiveData()}
+          savedCopyNeedsReview={savedCopyNeedsReview}
+          onTogglePersist={togglePersistence}
           onSelectSignature={setSelectedSignatureId}
           onAddSignature={addSignature}
           onRemoveSignature={removeSignature}

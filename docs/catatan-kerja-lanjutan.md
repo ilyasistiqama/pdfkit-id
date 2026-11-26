@@ -10,14 +10,13 @@
 - Meta per halaman: title, description, canonical, Open Graph, Twitter card, JSON-LD.
 - `sitemap.xml`, `robots.txt`, `ads.txt`, dan `404.html` dibuat saat build.
 - Halaman Tentang, Kontak, Privasi, Syarat, FAQ.
-- Empat artikel pendukung sebagai pintu masuk SEO.
-- Komponen slot iklan (`AdSlot`) dengan tinggi yang dipesan, lazy load, label "Iklan", jarak aman
-  dari tombol unduh, dan tanpa memuat skrip sebelum consent.
+- Artikel tentang pilihan alat PDF, alur pengolahan dokumen, dan tanda tangan sebagai pintu masuk SEO.
+- Komponen slot iklan (`AdSlot`) memuat iklan saat mendekati area layar dan setelah pengguna
+  menyetujui cookie. Slot terisi diberi label "Iklan" dan berjarak dari tombol unduh. Slot kosong
+  atau belum dikonfigurasi tidak menyisakan ruang.
 - Cookie/consent notice (tersimpan di perangkat) yang menjadi gerbang pemuatan skrip iklan.
-  Notice dan tautan "Pengaturan cookie" di footer **hanya muncul bila `VITE_ADSENSE_CLIENT` atau
-  `VITE_ANALYTICS_SCRIPT` diisi** saat build (`consentNeeded()` di `src/site/consent.ts`). Selama
-  keduanya kosong, notice disembunyikan dan halaman Privasi/FAQ menyatakan belum ada cookie pihak
-  ketiga. Begitu iklan diaktifkan, notice dan teks lama kembali otomatis tanpa ubah kode.
+  Panel privasi menyediakan pilihan terpisah untuk analitik dan iklan sesuai layanan yang
+  dikonfigurasi. AdSense memerlukan CMP dan hanya berjalan pada katalog dan panduan.
 - Pelacakan konversi "dokumen berhasil diunduh" lewat hook analitik tanpa dependensi.
 - Kumpulan alat: gabung, pisah, PDF → JPG, JPG → PDF, kompres, putar halaman, watermark,
   isi formulir, dan batch signing.
@@ -48,26 +47,23 @@
 
 ### 1. Domain dan hosting
 
-- [ ] Daftarkan domain, arahkan ke GitHub Pages (atau VPS bila nanti mau dinamis).
-- [ ] Set `VITE_SITE_URL` (mis. `https://ttdpdf.id`) saat build agar canonical, Open Graph,
+- [ ] Setelah `muis.life` tersedia, gunakan domain utama untuk profil dan arahkan `pdfkit.muis.life`
+      ke deployment PDFKit.
+- [ ] Set `BASE_PATH=/` dan `VITE_SITE_URL=https://pdfkit.muis.life` agar canonical, Open Graph,
       `sitemap.xml`, dan `robots.txt` memakai URL final.
 - [ ] Bila pindah ke VPS: tambahkan header cache, kompresi Brotli, dan HTTP/2 atau HTTP/3 di reverse
       proxy (nginx/Caddy). Tidak wajib selama masih di GitHub Pages.
 
 ### 2. Akun iklan
 
-- [ ] Daftar AdSense, tunggu approval setelah konten terindeks.
-- [ ] Isi `VITE_ADSENSE_CLIENT` (format `ca-pub-xxxxxxxx`) dan `VITE_ADSENSE_SLOT_*` di environment
-      build. Tanpa nilai ini slot hanya menampilkan ruang kosong berlabel, tidak error.
-- [ ] `ads.txt` dibuat otomatis saat build dari `VITE_ADSENSE_CLIENT`
-      (`google.com, pub-xxxxxxxx, DIRECT, f08c47fec0942fa0`), tidak perlu file di `public/`.
-- [ ] **Bila tetap memakai `ilyasistiqama.github.io/pdfkit-id`:** `ads.txt` hasil build ada di
-      `/pdfkit-id/ads.txt`, sedangkan AdSense membacanya di akar domain
-      (`https://ilyasistiqama.github.io/ads.txt`). Buat repo terpisah `ilyasistiqama.github.io`,
-      aktifkan Pages, dan taruh `ads.txt` di akarnya. Dengan domain sendiri (`BASE_PATH=/`) masalah
-      ini hilang, dan peluang approval AdSense juga lebih baik daripada subdomain `github.io`.
-- [ ] Setelah `VITE_ADSENSE_CLIENT` diisi, pastikan notice "Iklan memakai cookie" muncul lagi di
-      kunjungan pertama dan skrip AdSense baru dimuat setelah "Setuju".
+- [ ] Tunda aktivasi iklan selama PDFKit memakai `ilyasistiqama.github.io/pdfkit-id/`.
+- [ ] Daftarkan `muis.life` ke AdSense, verifikasi dengan meta tag di situs profil, dan tunggu
+      status **Ready**. Publikasikan `ads.txt` di `https://muis.life/ads.txt`.
+- [ ] Biarkan Auto ads mati. Setelah **Ready**, isi `VITE_ADSENSE_CLIENT`,
+      `VITE_ADSENSE_SLOT_CONTENT`, dan `VITE_ADSENSE_CMP_SCRIPT` hanya di repo PDFKit. Ikuti
+      [panduan AdSense untuk PDFKit di subdomain](panduan-pasca-deploy.md#adsense-untuk-pdfkit-di-subdomain).
+- [ ] Uji pilihan dan pencabutan izin. Pastikan permintaan iklan menunggu sinyal CMP dan alat terbuka
+      tanpa skrip iklan.
 - [ ] Siapkan jaringan iklan cadangan (mis. Ezoic/Mediavine sesuai syarat trafik) agar suspend
       AdSense tidak berarti pendapatan nol.
 
@@ -82,9 +78,8 @@
 
 ### 4. Kepatuhan privasi lanjutan
 
-- [ ] Bila menargetkan trafik EEA/UK, pasang CMP bersertifikat (Google CMP atau penyedia lain) di
-      atas consent notice bawaan. Consent bawaan sekarang cukup untuk UU PDP Indonesia, belum tentu
-      untuk TCF v2.
+- [ ] Verifikasi CMP bersertifikat Google dan uji sinyal TCF sebelum penayangan.
+- [ ] Konfirmasi status PSE Lingkup Privat PDFKit ke Komdigi. Lanjutkan melalui OSS jika diwajibkan.
 - [ ] Tinjau ulang kebijakan privasi setelah venue iklan dan analytics final dipilih.
 
 ### 5. Pengujian perangkat nyata

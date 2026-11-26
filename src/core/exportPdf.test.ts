@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { PDFDocument, PDFName, PDFRawStream, decodePDFRawStream } from 'pdf-lib'
+import { PDFDict, PDFDocument, PDFHexString, PDFName, PDFRawStream, decodePDFRawStream, degrees } from 'pdf-lib'
+import { batchSignPdf } from './batchSignPdf'
 import { signPdf } from './exportPdf'
+import { hasDigitalSignature } from './pdfSignatures'
 
 const PNG_1X1 =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
@@ -28,5 +30,37 @@ describe('signPdf', () => {
       .map((stream) => new TextDecoder('latin1').decode(decodePDFRawStream(stream).decode()))
       .join('\n')
     expect(text).toMatch(/1 0 0 1 100 350 cm/)
+  })
+})
+
+describe('batchSignPdf', () => {
+  it('menempatkan paraf di semua halaman dan gambar utama hanya pada halaman terakhir', async () => {
+    const source = await PDFDocument.create()
+    source.addPage([612, 792])
+    source.addPage([612, 792]).setRotation(degrees(90))
+    const { bytes, primaryPage } = await batchSignPdf(await source.save(), 'Uji', {
+      pageMode: 'last', position: 'kanan-bawah', width: 26,
+      caption: { name: '', role: '', date: '' }, initials: true, initialsPosition: 'kiri-bawah', initialsWidth: 12,
+    }, { id: 'main', dataUrl: PNG_1X1, aspect: 2 }, { id: 'initials', dataUrl: PNG_1X1, aspect: 2 })
+
+    const doc = await PDFDocument.load(bytes)
+    expect(primaryPage).toBe(2)
+    expect(doc.getPages().map((page) => page.node.Resources()?.lookupMaybe(PDFName.of('XObject'), PDFDict)?.keys().length))
+      .toEqual([1, 2])
+    expect(doc.getPage(1).getRotation().angle).toBe(90)
+  })
+})
+
+describe('hasDigitalSignature', () => {
+  it('membedakan kolom tanda tangan kosong dari kolom yang memiliki data tanda tangan', async () => {
+    const doc = await PDFDocument.create()
+    doc.addPage()
+    const field = doc.context.obj({ FT: 'Sig' })
+    doc.getForm().acroForm.addField(doc.context.register(field))
+    const save = () => doc.save({ updateFieldAppearances: false })
+    expect(await hasDigitalSignature(await save())).toBe(false)
+
+    field.set(PDFName.of('V'), doc.context.obj({ ByteRange: [0, 12, 24, 36], Contents: PDFHexString.of('CAFE') }))
+    expect(await hasDigitalSignature(await save())).toBe(true)
   })
 })

@@ -3,20 +3,12 @@ import { RotateCw, X } from 'lucide-react'
 import { downloadBlob, formatBytes } from '../../core/download'
 import type { OcrLanguage } from '../../core/photoOcr'
 import type { PhotoFont } from '../../core/photoDocx'
-import { coversPhotoLine } from '../../core/photoGraphics'
+import { obscuresPhotoText } from '../../core/photoGraphics'
 import { editedPhotoLines, type PhotoLayout } from '../../core/photoLayout'
+import { decodePhotoUrl, normalizePhotoFile, PHOTO_ACCEPT, PHOTO_HINT } from '../../core/photoInput'
 import { trackDownload } from '../../site/analytics'
 import { ActionButton, DropZone, Field, FileList, Status, ToolBody, inputClass } from './ToolUi'
 import { PhotoGraphicPicker } from './PhotoGraphicPicker'
-
-const ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp'
-
-function isSupportedPhoto(file: File) {
-  if (file.type && file.type !== 'application/octet-stream') {
-    return ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
-  }
-  return /\.(jpe?g|png|webp)$/i.test(file.name)
-}
 
 type Page = {
   file: File
@@ -28,7 +20,7 @@ type Page = {
 }
 
 function withDocument(page: Page, layout: PhotoLayout): Page {
-  const lines = layout.lines.filter((line) => !layout.graphics?.some((graphic) => coversPhotoLine(graphic, line)))
+  const lines = layout.lines.filter((line) => !layout.graphics?.some((graphic) => obscuresPhotoText(graphic, line)))
   return { ...page, layout: { ...layout, lines }, draft: lines.map((line) => line.text).join('\n') }
 }
 
@@ -45,7 +37,7 @@ export default function PhotoToWordTool() {
   const [language, setLanguage] = useState<OcrLanguage>('ind')
   const [font, setFont] = useState<PhotoFont>('Times New Roman')
   const [exportMode, setExportMode] = useState<'editable' | 'photo'>('editable')
-  const [busy, setBusy] = useState<'ocr' | 'editable' | 'photo' | null>(null)
+  const [busy, setBusy] = useState<'checking' | 'ocr' | 'editable' | 'photo' | null>(null)
   const [progress, setProgress] = useState<number | null>(null)
   const [reading, setReading] = useState('')
   const [error, setError] = useState('')
@@ -71,17 +63,40 @@ export default function PhotoToWordTool() {
     setError('')
   }
 
-  const selectPhoto = (files: File[]) => {
+  const selectPhoto = async (files: File[]) => {
     if (currentJob.current) return
-    const next = files.filter(isSupportedPhoto).map((file): Page => {
-      const url = URL.createObjectURL(file)
-      urls.current.add(url)
-      return { file, url, rotation: 0, layout: null, draft: '', photoOnly: false }
-    })
-    setError(next.length !== files.length ? 'Pilih foto berformat JPG, PNG, atau WebP.' : '')
-    if (!next.length) return
-    setPages((previous) => [...previous, ...next])
-    if (!pages.length) setActiveUrl(next[0].url)
+    const job = new AbortController()
+    currentJob.current = job
+    setBusy('checking')
+    setError('')
+    const next: Page[] = []
+    const errors: string[] = []
+    try {
+      for (const file of files) {
+        let url: string | undefined
+        try {
+          const normalized = await normalizePhotoFile(file)
+          if (job.signal.aborted) return
+          url = URL.createObjectURL(normalized)
+          urls.current.add(url)
+          await decodePhotoUrl(url)
+          if (job.signal.aborted) return
+          next.push({ file, url, rotation: 0, layout: null, draft: '', photoOnly: false })
+        } catch (error) {
+          if (url) { URL.revokeObjectURL(url); urls.current.delete(url) }
+          if (job.signal.aborted) return
+          errors.push(`${file.name}: ${error instanceof Error ? error.message : 'Gambar gagal dibaca.'}`)
+        }
+      }
+      if (next.length) {
+        setPages((previous) => [...previous, ...next])
+        setActiveUrl((previous) => previous || next[0].url)
+      }
+      setError(errors.join(' '))
+    } finally {
+      currentJob.current = null
+      if (!job.signal.aborted) setBusy(null)
+    }
   }
 
   const remove = (from: number) => {
@@ -174,9 +189,10 @@ export default function PhotoToWordTool() {
   return (
     <ToolBody>
       {!busy && (
-        <DropZone accept={ACCEPT} multiple onFiles={selectPhoto} compact={!!file}
-          label={file ? 'Tambah foto' : 'Pilih foto dokumen'} hint="JPG, PNG, atau WebP" />
+        <DropZone accept={PHOTO_ACCEPT} multiple onFiles={(files) => void selectPhoto(files)} compact={!!file}
+          label={file ? 'Tambah foto' : 'Pilih foto dokumen'} hint={`${PHOTO_HINT} sesuai dukungan browser`} />
       )}
+      {busy === 'checking' && <Status tone="info">Memeriksa format dan membuka foto…</Status>}
       {pages.length > 1 && (
         <div className="space-y-2">
           {!busy && <FileList files={pages.map((page) => page.file)} onRemove={remove} onMove={move} />}
@@ -291,7 +307,7 @@ export default function PhotoToWordTool() {
         <>
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-sunken px-3 py-2.5">
             <p className="text-xs text-muted">
-              {layout.graphics?.length ? `${layout.graphics.length} area gambar dipertahankan. Teks di area itu tetap menyatu dengan gambar.`
+              {layout.graphics?.length ? `${layout.graphics.length} gambar dipertahankan. Teks yang terbaca di sekitar stempel dan tanda tangan bisa diedit.`
                 : 'Tandai logo, stempel, atau tanda tangan yang ingin dipertahankan.'}
             </p>
             <button type="button" disabled={!!busy || !sourceUrl} onClick={() => setPickingGraphic(true)}

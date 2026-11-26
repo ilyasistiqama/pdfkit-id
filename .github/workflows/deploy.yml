@@ -36,6 +36,8 @@ jobs:
           # dan VITE_SITE_URL=https://domain-anda.
           BASE_PATH: ${{ vars.BASE_PATH || format('/{0}/', github.event.repository.name) }}
           VITE_SITE_URL: ${{ vars.VITE_SITE_URL || 'https://ilyasistiqama.github.io/pdfkit-id' }}
+          VITE_SIGNATURE_STORAGE_ORIGIN: ${{ vars.VITE_SIGNATURE_STORAGE_ORIGIN }}
+          VITE_ADSENSE_CMP_SCRIPT: ${{ vars.VITE_ADSENSE_CMP_SCRIPT }}
           VITE_ADSENSE_CLIENT: ${{ vars.VITE_ADSENSE_CLIENT }}
           VITE_ADSENSE_SLOT_CONTENT: ${{ vars.VITE_ADSENSE_SLOT_CONTENT }}
           VITE_ADSENSE_SLOT_SIDEBAR: ${{ vars.VITE_ADSENSE_SLOT_SIDEBAR }}

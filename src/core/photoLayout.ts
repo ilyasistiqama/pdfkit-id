@@ -6,6 +6,7 @@ export interface PhotoLine {
   bounds?: Bbox
   baseline?: number
   tabStarts?: number[]
+  tabEnds?: number[]
   underline?: boolean
 }
 
@@ -34,6 +35,10 @@ function rowHeight(row: RecognizedRow) {
   return median(row.words.map(({ bbox }) => bbox.y1 - bbox.y0))
 }
 
+function normalizedRow(row: RecognizedRow) {
+  return row.words.map(({ text }) => text).join('').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
+}
+
 export function readOcrRow(line: Line, width: number, x = 0, y = 0): RecognizedRow {
   const words = line.words.filter((word) => word.text.trim()).map((word) => {
     const { x0, x1, y0, y1 } = word.bbox
@@ -50,18 +55,24 @@ export function readOcrRow(line: Line, width: number, x = 0, y = 0): RecognizedR
 }
 
 export function reconcileRows(rows: RecognizedRow[], overlay: RecognizedRow[], color: Bbox | null) {
+  const printRows = overlay.filter((row) => row.confidence >= 78 && /\p{L}{3}/u.test(normalizedRow(row)))
   const result = rows.filter((row) => {
     if (!row.words.length) return false
     if (!color || !overlay.length) return true
     const first = row.words[0].bbox
     const last = row.words.at(-1)!.bbox
-    const inStamp = rowBaseline(row) > color.y0 && rowBaseline(row) < color.y1 &&
-      first.x0 < color.x1 && last.x1 > color.x0
-    return !inStamp || /\p{L}{3}/u.test(row.words.map((word) => word.text).join(' '))
+    const baseline = rowBaseline(row)
+    const inStamp = baseline > color.y0 && baseline < color.y1 && first.x0 < color.x1 && last.x1 > color.x0
+    if (!inStamp) return true
+    const text = normalizedRow(row)
+    if (!/[\p{L}\p{N}]{3}/u.test(text)) return false
+    const interior = (baseline - color.y0) / (color.y1 - color.y0)
+    const smallFragment = row.words.length <= 2 && /^\p{L}{3,8}$/u.test(text) && interior > 0.12 && interior < 0.8
+    return !smallFragment || printRows.some((candidate) =>
+      Math.abs(rowBaseline(candidate) - baseline) < rowHeight(row) && normalizedRow(candidate).includes(text),
+    )
   })
-  for (const candidate of overlay) {
-    const text = candidate.words.map((word) => word.text).join(' ')
-    if (candidate.confidence < 78 || !/\p{L}{3}/u.test(text)) continue
+  for (const candidate of printRows) {
     const baseline = rowBaseline(candidate)
     const index = result.findIndex((row) =>
       Math.abs(rowBaseline(row) - baseline) < rowHeight(candidate) * 0.55 &&
@@ -70,8 +81,12 @@ export function reconcileRows(rows: RecognizedRow[], overlay: RecognizedRow[], c
     )
     if (index >= 0) {
       const previous = result[index]
+      const previousText = normalizedRow(previous)
+      const candidateText = normalizedRow(candidate)
+      const moreComplete = previousText.length > 0 && candidateText.length >= previousText.length + 2 &&
+        candidateText.includes(previousText) && candidate.confidence >= previous.confidence - 10
       if (candidate.confidence > previous.confidence + 8 ||
-        (candidate.confidence >= previous.confidence && candidate.words.length > previous.words.length)) {
+        (candidate.confidence >= previous.confidence && candidate.words.length > previous.words.length) || moreComplete) {
         result[index] = candidate
       }
     } else if (color && baseline >= color.y0 + (color.y1 - color.y0) * 0.75) {
@@ -92,17 +107,24 @@ export function layoutRows(rows: RecognizedRow[], width: number): PhotoLine[] {
   }))
   const pairs = positions.flatMap((left) => positions.flatMap((right) => {
     const gap = right.x - left.right
-    const sameLine = Math.abs(left.y - right.y) <= Math.min(left.height, right.height) * 0.42
-    return sameLine && gap > width * 0.035 && gap < width * 0.28 ? [{ left, right }] : []
+    if (left === right || right.x <= left.x || gap >= width * 0.28) return []
+    const delta = Math.abs(left.y - right.y)
+    const shortest = Math.min(left.height, right.height)
+    const overlap = Math.min(left.y, right.y) - Math.max(left.y - left.height, right.y - right.height)
+    const hasSeparator = left.row.words.at(-1)!.text.endsWith(':') || right.row.words[0].text.startsWith(':')
+    const field = hasSeparator && left.row.words.length <= 6 && gap >= -width * 0.008 &&
+      overlap >= shortest * 0.3 && delta <= Math.max(left.height, right.height) * 0.72
+    const columns = gap > width * 0.035 && delta <= shortest * 0.42
+    return field || columns ? [{ left, right, field, delta, gap }] : []
   }))
-  const matches = pairs.filter(({ left, right }) => {
-    if (left.row.words.length <= 4) return true
+  const matches = pairs.filter(({ left, right, field }) => {
+    if (field || left.row.words.length <= 4) return true
     // Kolom dengan kalimat panjang harus punya sela yang berulang di beberapa baris.
     return pairs.filter((pair) =>
       Math.abs(pair.left.x - left.x) <= width * 0.035 && Math.abs(pair.right.x - right.x) <= width * 0.035 &&
       Math.abs(pair.left.y - left.y) > left.height,
     ).length >= 2
-  })
+  }).sort((first, second) => Number(second.field) - Number(first.field) || first.delta - second.delta || first.gap - second.gap)
   const remaining = new Set(positions)
   const lines: PhotoLine[] = []
   for (const position of positions) {
@@ -133,7 +155,8 @@ export function layoutRows(rows: RecognizedRow[], width: number): PhotoLine[] {
     for (const [index, word] of words.entries()) {
       if (index > 0) {
         const gap = word.bbox.x0 - words[index - 1].bbox.x1
-        const tab = gap > Math.max(height * 1.2, width * 0.012)
+        const separator = word.text.startsWith(':') && index <= 6
+        const tab = gap > (separator ? Math.max(height * 0.55, width * 0.008) : Math.max(height * 1.2, width * 0.012))
         if (tab) tabStarts.push(word.bbox.x0)
         if (tab || !/^[:;,.!?]$/.test(word.text) || word.text === ':') text += tab ? '\t' : ' '
       }
@@ -141,7 +164,72 @@ export function layoutRows(rows: RecognizedRow[], width: number): PhotoLine[] {
     }
     lines.push({ text, bounds, baseline, tabStarts })
   }
-  return lines
+  return lines.sort((first, second) => first.baseline! - second.baseline! || first.bounds!.x0 - second.bounds!.x0)
+}
+
+function colonAt({ data, width, height }: ImageData, anchor: number, bounds: Bbox) {
+  const glyphHeight = bounds.y1 - bounds.y0
+  const x0 = Math.max(0, Math.floor(anchor - width * 0.012))
+  const x1 = Math.min(width, Math.ceil(anchor + width * 0.012))
+  const y0 = Math.max(0, Math.floor(bounds.y0))
+  const y1 = Math.min(height, Math.ceil(bounds.y1 + glyphHeight * 0.24))
+  const dots: Bbox[] = []
+  let dot: Bbox | undefined
+  for (let y = y0; y < y1; y++) {
+    let first = x1
+    let last = x0
+    for (let x = x0; x < x1; x++) {
+      const pixel = (y * width + x) * 4
+      if (Math.max(data[pixel], data[pixel + 1], data[pixel + 2]) >= 132) continue
+      first = Math.min(first, x)
+      last = Math.max(last, x + 1)
+    }
+    if (first >= last) {
+      dot = undefined
+    } else if (dot) {
+      dot.x0 = Math.min(dot.x0, first)
+      dot.x1 = Math.max(dot.x1, last)
+      dot.y1 = y + 1
+    } else {
+      dot = { x0: first, x1: last, y0: y, y1: y + 1 }
+      dots.push(dot)
+    }
+  }
+  if (dots.length !== 2) return null
+  const [upper, lower] = dots
+  const gap = lower.y0 - upper.y1
+  const horizontalOffset = Math.abs((upper.x0 + upper.x1) - (lower.x0 + lower.x1)) / 2
+  const looksLikeDot = (area: Bbox) => area.x1 - area.x0 >= 2 && area.x1 - area.x0 <= glyphHeight * 0.29 &&
+    area.y1 - area.y0 >= 2 && area.y1 - area.y0 <= glyphHeight * 0.27
+  return dots.every(looksLikeDot) && gap >= glyphHeight * 0.11 && gap <= glyphHeight * 0.49 &&
+    horizontalOffset <= glyphHeight * 0.16 ? Math.min(upper.x0, lower.x0) : null
+}
+
+/** Baca kembali dua titik yang terlewat OCR pada kolom pemisah formulir yang konsisten. */
+export function restoreFieldColons(pixels: ImageData, lines: PhotoLine[]) {
+  const anchors = lines.flatMap((line) => {
+    const boundary = line.text.split('\t').slice(1).findIndex((chunk) => chunk.trimStart().startsWith(':'))
+    const x = line.tabStarts?.[boundary]
+    return line.bounds && x !== undefined ? [{ x, y: line.bounds.y0 }] : []
+  })
+  for (const line of lines) {
+    const bounds = line.bounds
+    if (!bounds || line.text.includes(':') || line.tabStarts?.length ||
+      !/\p{L}$/u.test(line.text) || line.text.split(/\s+/).length > 6) continue
+    const nearby = anchors.filter(({ x, y }) =>
+      x - bounds.x1 >= pixels.width * 0.055 && Math.abs(y - bounds.y0) < pixels.height * 0.16,
+    )
+    if (nearby.length < 3 || !nearby.some(({ y }) => y < bounds.y0) || !nearby.some(({ y }) => y > bounds.y0)) continue
+    const center = median(nearby.map(({ x }) => x))
+    const aligned = nearby.filter(({ x }) => Math.abs(x - center) <= pixels.width * 0.013)
+    if (aligned.length < 3) continue
+    const colon = colonAt(pixels, median(aligned.map(({ x }) => x)), bounds)
+    if (colon === null) continue
+    line.text += '\t:'
+    line.tabStarts = [colon]
+    line.tabEnds = [bounds.x1]
+    bounds.x1 = colon + Math.ceil((bounds.y1 - bounds.y0) * 0.23)
+  }
 }
 
 /** Cari garis cetak panjang di sela kop dan judul. */

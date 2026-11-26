@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { RouterProvider, usePath } from './router'
-import { matchRoute, STATIC_PAGES, TOOLS, toolTitle, type Match } from './site/routes'
+import { ARTICLES_INDEX, matchRoute, STATIC_PAGES, TOOLS, toolTitle, type Match } from './site/routes'
 import { CONTACT_EMAIL, SITE_NAME } from './site/site'
 import { useSeo } from './site/useSeo'
 import { SiteHeader } from './web/site/SiteHeader'
@@ -34,12 +34,12 @@ const PhotoToWordTool = lazy(() => import('./web/tools/PhotoToWordTool'))
 const SearchablePdfTool = lazy(() => import('./web/tools/SearchablePdfTool'))
 const OrganizePdfTool = lazy(() => import('./web/tools/OrganizePdfTool'))
 const RedactPdfTool = lazy(() => import('./web/tools/RedactPdfTool'))
+const WorkflowPdfTool = lazy(() => import('./web/tools/WorkflowPdfTool'))
+const ComparePdfTool = lazy(() => import('./web/tools/ComparePdfTool'))
 const PdfToJpgTool = lazy(() =>
   import('./web/tools/ConvertTools').then((module) => ({ default: module.PdfToJpgTool })),
 )
-const CompressTool = lazy(() =>
-  import('./web/tools/ConvertTools').then((module) => ({ default: module.CompressTool })),
-)
+const CompressTool = lazy(() => import('./web/tools/CompressTool'))
 const FillFormTool = lazy(() =>
   import('./web/tools/FillFormTool').then((module) => ({ default: module.FillFormTool })),
 )
@@ -56,6 +56,8 @@ const TOOL_COMPONENTS = {
   'pdf-bisa-dicari': SearchablePdfTool,
   'susun-pdf': OrganizePdfTool,
   'sensor-pdf': RedactPdfTool,
+  'workflow-pdf': WorkflowPdfTool,
+  'bandingkan-pdf': ComparePdfTool,
   'kompres-pdf': CompressTool,
   'putar-pdf': RotateTool,
   'watermark-pdf': WatermarkTool,
@@ -112,9 +114,7 @@ export function headFor(match: Match) {
     case 'articles':
       return {
         path: '/artikel',
-        title: 'Artikel — panduan tanda tangan dokumen',
-        description:
-          'Panduan praktis seputar tanda tangan elektronik, keabsahan dokumen, dan cara menangani PDF di HP maupun komputer.',
+        ...ARTICLES_INDEX,
       }
     case 'article':
       return {

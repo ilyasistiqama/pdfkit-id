@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { imagesToPdf, uniqueName } from '../../core/pdfOps'
 import { downloadBlob, pdfBlob } from '../../core/download'
 import { trackDownload } from '../../site/analytics'
+import { PHOTO_ACCEPT, PHOTO_HINT } from '../../core/photoInput'
 import { ActionButton, DropZone, Field, FileList, Status, ToolBody } from './ToolUi'
 
 export function JpgToPdfTool() {
@@ -38,11 +39,11 @@ export function JpgToPdfTool() {
   return (
     <ToolBody>
       <DropZone
-        accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+        accept={PHOTO_ACCEPT}
         multiple
         onFiles={(next) => setFiles((current) => [...current, ...next])}
-        label="Pilih foto JPG atau PNG"
-        hint="Bisa beberapa berkas sekaligus"
+        label="Pilih beberapa foto"
+        hint={`${PHOTO_HINT} sesuai dukungan browser`}
       />
 
       <FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} onMove={move} />

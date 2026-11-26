@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { PDFDocument } from 'pdf-lib'
 import { parseRanges, splitPdf } from '../../core/pdfOps'
 import { downloadAll, formatBytes, pdfBlob, type OutputFile } from '../../core/download'
+import { confirmSignedPdfChange, SignedPdfNotice } from './SignedPdfNotice'
 import { ActionButton, DropZone, Field, Status, ToolBody, inputClass } from './ToolUi'
 
 export function SplitTool() {
@@ -36,6 +37,7 @@ export function SplitTool() {
     setError('')
     setOutputs(null)
     try {
+      if (!await confirmSignedPdfChange(file)) return
       const bytes = new Uint8Array(await file.arrayBuffer())
       const parsed = mode === 'range' ? parseRanges(ranges, pageCount) : [{ from: 1, to: pageCount }]
       const results = await splitPdf(bytes, parsed, mode === 'separate', file.name.replace(/\.pdf$/i, ''))
@@ -71,6 +73,8 @@ export function SplitTool() {
               {pageCount} halaman · {formatBytes(file.size)}
             </p>
           </div>
+
+          <SignedPdfNotice source={file} />
 
           <div className="grid grid-cols-2 gap-1 rounded-xl bg-sunken p-1">
             {([

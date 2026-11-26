@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react'
 import { BASE_PATH, href } from './site/site'
+import { adsConfigured, isAdvertisingPath } from './site/ads'
 
 const ROUTE_EVENT = 'ttd:route'
 
@@ -27,6 +28,11 @@ export function navigate(to: string, options: { replace?: boolean } = {}) {
   if (typeof window === 'undefined') return
   const url = href(to)
   if (window.location.pathname === url) return
+  if (adsConfigured() && isAdvertisingPath(readPath()) !== isAdvertisingPath(to)) {
+    if (options.replace) window.location.replace(url)
+    else window.location.assign(url)
+    return
+  }
   if (options.replace) window.history.replaceState(null, '', url)
   else window.history.pushState(null, '', url)
   window.dispatchEvent(new Event(ROUTE_EVENT))

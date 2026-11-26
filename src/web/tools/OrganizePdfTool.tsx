@@ -3,6 +3,7 @@ import { downloadBlob, pdfBlob } from '../../core/download'
 import { organizePdf, type PageArrangement } from '../../core/pdfOps'
 import { trackDownload } from '../../site/analytics'
 import { PdfToolPreview, useToolPdf } from './PdfToolPreview'
+import { confirmSignedPdfChange, SignedPdfNotice } from './SignedPdfNotice'
 import { ActionButton, DropZone, Status, ToolBody } from './ToolUi'
 
 export default function OrganizePdfTool() {
@@ -34,6 +35,7 @@ export default function OrganizePdfTool() {
     setBusy(true)
     setError('')
     try {
+      if (!await confirmSignedPdfChange(selected.file, controller.signal)) return
       const data = await organizePdf(selected.bytes, pages)
       controller.signal.throwIfAborted()
       downloadBlob(pdfBlob(data), `${selected.file.name.replace(/\.pdf$/i, '')}-disusun.pdf`)
@@ -61,6 +63,7 @@ export default function OrganizePdfTool() {
               <button type="button" disabled={busy} className="hover:underline" onClick={() => { clear(); setError('') }}>Ganti PDF</button>
             </div>
           </div>
+          <SignedPdfNotice source={selected.file} />
           <p className="text-sm text-muted">Seret kartu atau gunakan panah untuk mengubah urutan.</p>
           <ol className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {pages.map((page, position) => (

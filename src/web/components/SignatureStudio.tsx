@@ -13,6 +13,8 @@ interface Props {
   selectedId: string | null
   activePage: number
   persist: boolean
+  canPersist: boolean
+  savedCopyNeedsReview: boolean
   onTogglePersist: (value: boolean) => void
   onSelect: (id: string) => void
   onAdd: (image: SignatureImage) => void
@@ -22,7 +24,7 @@ interface Props {
 
 const TABS = [
   { id: 'draw', label: 'Gambar', icon: PenLine },
-  { id: 'upload', label: 'Unggah PNG', icon: Upload },
+  { id: 'upload', label: 'Unggah gambar', icon: Upload },
 ] as const
 
 const today = () =>
@@ -35,6 +37,8 @@ export function SignatureStudio({
   selectedId,
   activePage,
   persist,
+  canPersist,
+  savedCopyNeedsReview,
   onTogglePersist,
   onSelect,
   onAdd,
@@ -65,6 +69,7 @@ export function SignatureStudio({
 
   return (
     <div>
+      <p className="mb-3 text-xs leading-relaxed text-muted">Gunakan gambar tanda tangan milik Anda atau yang telah diizinkan pemiliknya.</p>
       <div className="mb-3 flex gap-1 rounded-xl bg-sunken p-1">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
@@ -150,8 +155,8 @@ export function SignatureStudio({
       {signatures.length > 0 && (
         <div className="mt-5 border-t border-line pt-4">
           <div className="flex items-center justify-between gap-2">
-            <p className={eyebrow}>Tanda tangan tersimpan</p>
-            <button
+            <p className={eyebrow}>Gambar tanda tangan</p>
+            {canPersist && <button
               type="button"
               onClick={() => onTogglePersist(!persist)}
               aria-pressed={persist}
@@ -166,9 +171,18 @@ export function SignatureStudio({
               )}
             >
               <HardDrive className="size-3" strokeWidth={2} />
-              {persist ? 'Tersimpan' : 'Sementara'}
-            </button>
+              {persist ? 'Tersimpan di browser' : 'Simpan di browser'}
+            </button>}
           </div>
+          {!persist && <p className="mt-1 text-xs text-muted">Gambar tersedia sampai tab ditutup atau dimuat ulang. Unduh PNG untuk dipakai lagi.</p>}
+          {savedCopyNeedsReview && (
+            <div className="mt-2 rounded-lg bg-gold-soft p-2 text-xs leading-relaxed text-ink-soft">
+              Ada salinan dari versi atau pengaturan lama. Unduh PNG dulu bila ingin menyimpannya sendiri.
+              <button type="button" onClick={() => onTogglePersist(false)} className="mt-1 block font-medium text-loss hover:underline">
+                Hapus salinan lama dari browser
+              </button>
+            </div>
+          )}
 
           <ul className="mt-2 grid grid-cols-2 gap-2">
             {signatures.map((signature, index) => (

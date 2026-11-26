@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { fillFormPdf, readFormFields, type FormField } from '../../core/pdfOps'
+import { fillFormPdf, readFormFields, type FormField, type FormValue } from '../../core/pdfOps'
 import { downloadBlob, pdfBlob } from '../../core/download'
 import { trackDownload } from '../../site/analytics'
+import { confirmSignedPdfChange, SignedPdfNotice } from './SignedPdfNotice'
 import { ActionButton, DropZone, Field, Status, ToolBody, inputClass } from './ToolUi'
 
 export function FillFormTool() {
   const [file, setFile] = useState<File | null>(null)
   const [fields, setFields] = useState<FormField[]>([])
-  const [values, setValues] = useState<Record<string, string | boolean>>({})
+  const [values, setValues] = useState<Record<string, FormValue>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState('')
@@ -21,13 +22,7 @@ export function FillFormTool() {
       const list = await readFormFields(new Uint8Array(await next.arrayBuffer()))
       setFile(next)
       setFields(list)
-      const initial: Record<string, string | boolean> = {}
-      for (const field of list) {
-        if (field.kind === 'text') initial[field.name] = field.value
-        else if (field.kind === 'checkbox') initial[field.name] = field.checked
-        else initial[field.name] = field.value ?? ''
-      }
-      setValues(initial)
+      setValues(Object.fromEntries(list.map((field) => [field.name, field.kind === 'checkbox' ? field.checked : field.value ?? ''])))
     } catch {
       setError('PDF tidak bisa dibaca. Berkas mungkin terkunci atau rusak.')
     } finally {
@@ -41,18 +36,19 @@ export function FillFormTool() {
     setError('')
     setDone('')
     try {
+      if (!await confirmSignedPdfChange(file)) return
       const output = await fillFormPdf(new Uint8Array(await file.arrayBuffer()), values)
       downloadBlob(pdfBlob(output), `${file.name.replace(/\.pdf$/i, '')}-terisi.pdf`)
       trackDownload('isi-formulir-pdf')
-      setDone('PDF terisi sudah diunduh. Kolom dibuat rata agar tampil sama di semua penampil.')
-    } catch {
-      setError('Gagal menyimpan isian. Coba lagi dengan berkas lain.')
+      setDone('PDF terisi sudah diunduh. Buka hasilnya untuk memeriksa isian.')
+    } catch (error) {
+      setError(error instanceof Error && error.cause ? error.message : 'Gagal menyimpan isian. Coba lagi dengan berkas lain.')
     } finally {
       setBusy(false)
     }
   }
 
-  const setField = (name: string, value: string | boolean) =>
+  const setField = (name: string, value: FormValue) =>
     setValues((current) => ({ ...current, [name]: value }))
 
   return (
@@ -77,6 +73,8 @@ export function FillFormTool() {
             <p className="text-sm font-medium text-ink">{file.name}</p>
             <p className="text-[0.72rem] text-muted">{fields.length} kolom terdeteksi</p>
           </div>
+
+          <SignedPdfNotice source={file} />
 
           <div className="space-y-3">
             {fields.map((field) => {
@@ -112,6 +110,21 @@ export function FillFormTool() {
                     />
                     <span className="text-sm text-ink-soft">{field.name}</span>
                   </label>
+                )
+              }
+
+              if (field.kind === 'multiselect') {
+                const selected = values[field.name]
+                return (
+                  <fieldset key={field.name} className="space-y-2 rounded-xl bg-surface p-3 ring-1 ring-line/70">
+                    <legend className="px-1 text-xs font-medium text-muted">{field.name}</legend>
+                    {field.options.map((option) => <label key={option} className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={Array.isArray(selected) && selected.includes(option)} onChange={(event) => {
+                        const current = Array.isArray(selected) ? selected : []
+                        setField(field.name, event.target.checked ? [...current, option] : current.filter((item) => item !== option))
+                      }} className="accent-[var(--gold)]" /> {option}
+                    </label>)}
+                  </fieldset>
                 )
               }
 

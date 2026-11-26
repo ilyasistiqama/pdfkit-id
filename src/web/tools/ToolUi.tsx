@@ -190,7 +190,7 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 export const inputClass =
   'h-10 w-full rounded-xl bg-surface px-3 text-sm outline-none ring-1 ring-line focus:ring-gold/60'
 
-export function Progress({ value, total }: { value: number; total: number }) {
+export function Progress({ value, total, unit = 'halaman' }: { value: number; total: number; unit?: string }) {
   if (!total) return null
   const percent = Math.round((value / total) * 100)
   return (
@@ -199,7 +199,7 @@ export function Progress({ value, total }: { value: number; total: number }) {
         <div className="h-full rounded-full bg-gold transition-all" style={{ width: `${percent}%` }} />
       </div>
       <p className="mt-1.5 text-[0.72rem] text-muted tabular-nums">
-        {value} / {total} halaman
+        {value} / {total} {unit}
       </p>
     </div>
   )

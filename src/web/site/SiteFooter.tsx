@@ -88,7 +88,7 @@ export function SiteFooter() {
                     }
                     className="text-[0.82rem] text-ink-soft hover:text-ink hover:underline"
                   >
-                    Pengaturan cookie
+                    Pengaturan privasi
                   </button>
                 </li>
               )}
