@@ -35,7 +35,11 @@ document is uploaded to a server.
 | Gabung PDF | Merge several PDFs into one, order adjustable |
 | Pisah PDF | Extract ranges or split into one file per page |
 | PDF ke JPG | Render pages to JPG/PNG at selectable resolution |
-| JPG ke PDF | Compose photos/scans into a PDF (A4 or image-sized) |
+| Foto ke PDF | Compose photos/scans into a PDF (A4 or image-sized) |
+| Foto ke Word | Arrange multiple photos and export one editable DOCX or photo copy |
+| PDF Scan Bisa Dicari | Add searchable Indonesian/English OCR text to scanned PDF pages |
+| Susun Halaman PDF | Reorder, rotate, and remove pages with thumbnails |
+| Sensor PDF | Permanently cover selected regions and export a new image-only PDF |
 | Kompres PDF | Shrink by re-rasterising at lower resolution |
 | Putar PDF | Rotate all/odd/even pages by 90/180/270 |
 | Watermark PDF | Text watermark with color, size, opacity, diagonal |

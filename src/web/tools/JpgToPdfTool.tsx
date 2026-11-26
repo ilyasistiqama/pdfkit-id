@@ -25,9 +25,9 @@ export function JpgToPdfTool() {
     setBusy(true)
     setError('')
     try {
-      const output = await imagesToPdf(files, { layout, margin: layout === 'a4' ? margin : 0 }, 'Gambar ke PDF')
+      const output = await imagesToPdf(files, { layout, margin: layout === 'a4' ? margin : 0 }, 'Foto ke PDF')
       downloadBlob(pdfBlob(output), uniqueName('gambar.pdf', new Set()))
-      trackDownload('jpg-ke-pdf')
+      trackDownload('foto-ke-pdf')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Gagal membuat PDF dari gambar.')
     } finally {
@@ -41,7 +41,7 @@ export function JpgToPdfTool() {
         accept="image/jpeg,image/png,.jpg,.jpeg,.png"
         multiple
         onFiles={(next) => setFiles((current) => [...current, ...next])}
-        label="Pilih gambar JPG atau PNG"
+        label="Pilih foto JPG atau PNG"
         hint="Bisa beberapa berkas sekaligus"
       />
 

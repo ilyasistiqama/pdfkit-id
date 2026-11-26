@@ -14,6 +14,8 @@ const Icon = ({ name }: { name: string }) => {
     stamp: 'M6 17h12M8 17l1-4V7a3 3 0 0 1 6 0v6l1 4',
     form: 'M5 4h14v16H5zM8 9h8M8 13h8M8 17h4',
     layers: 'M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5',
+    search: 'M14 14l5 5M16 11a5 5 0 1 1-10 0 5 5 0 0 1 10 0z',
+    redact: 'M4 5h16v14H4zM7 10h10v4H7z',
   }
   return (
     <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -105,7 +107,7 @@ export function ToolsIndex() {
     <div className="mx-auto w-full max-w-5xl px-5 pt-10 pb-4">
       <p className={eyebrow}>Kumpulan alat</p>
       <h1 className="mt-2 font-serif text-3xl leading-tight tracking-tight sm:text-4xl">
-        Alat PDF yang berjalan di browser
+        Alat dokumen yang berjalan di browser
       </h1>
       <p className="mt-3 max-w-2xl text-[0.95rem] leading-relaxed text-ink-soft">
         Gabung, pisah, ubah, dan rapikan dokumen tanpa memasang aplikasi. Berkas diproses di perangkat

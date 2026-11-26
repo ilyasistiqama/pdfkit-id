@@ -1,6 +1,6 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { RouterProvider, usePath } from './router'
-import { matchRoute, STATIC_PAGES, TOOLS, type Match } from './site/routes'
+import { matchRoute, STATIC_PAGES, TOOLS, toolTitle, type Match } from './site/routes'
 import { CONTACT_EMAIL, SITE_NAME } from './site/site'
 import { useSeo } from './site/useSeo'
 import { SiteHeader } from './web/site/SiteHeader'
@@ -30,6 +30,10 @@ const SplitTool = lazy(() =>
 const JpgToPdfTool = lazy(() =>
   import('./web/tools/JpgToPdfTool').then((module) => ({ default: module.JpgToPdfTool })),
 )
+const PhotoToWordTool = lazy(() => import('./web/tools/PhotoToWordTool'))
+const SearchablePdfTool = lazy(() => import('./web/tools/SearchablePdfTool'))
+const OrganizePdfTool = lazy(() => import('./web/tools/OrganizePdfTool'))
+const RedactPdfTool = lazy(() => import('./web/tools/RedactPdfTool'))
 const PdfToJpgTool = lazy(() =>
   import('./web/tools/ConvertTools').then((module) => ({ default: module.PdfToJpgTool })),
 )
@@ -47,7 +51,11 @@ const TOOL_COMPONENTS = {
   'gabung-pdf': MergeTool,
   'pisah-pdf': SplitTool,
   'pdf-ke-jpg': PdfToJpgTool,
-  'jpg-ke-pdf': JpgToPdfTool,
+  'foto-ke-pdf': JpgToPdfTool,
+  'foto-ke-word': PhotoToWordTool,
+  'pdf-bisa-dicari': SearchablePdfTool,
+  'susun-pdf': OrganizePdfTool,
+  'sensor-pdf': RedactPdfTool,
   'kompres-pdf': CompressTool,
   'putar-pdf': RotateTool,
   'watermark-pdf': WatermarkTool,
@@ -82,12 +90,12 @@ export function headFor(match: Match) {
         path: '/alat',
         title: 'Alat PDF — gabung, pisah, kompres, dan lainnya',
         description:
-          'Kumpulan alat PDF gratis yang berjalan di browser: gabung, pisah, PDF ke JPG, JPG ke PDF, kompres, putar, watermark, dan isi formulir.',
+          'Gabung, pisah, dan kompres PDF, atau ubah foto dokumen menjadi Word. Semua alat berjalan langsung di browser.',
       }
     case 'tool':
       return {
         path: `/alat/${match.tool.slug}`,
-        title: `${match.tool.name} — alat PDF gratis di browser`,
+        title: toolTitle(match.tool),
         description: match.tool.description,
         jsonLd: [
           {
@@ -162,8 +170,6 @@ export function headFor(match: Match) {
 }
 
 function PageChrome({ match }: { match: Match }) {
-  useSeo(headFor(match))
-
   switch (match.kind) {
     case 'tools':
       return <ToolsIndex />
@@ -256,8 +262,10 @@ function ToolPlaceholder() {
 
 function Routes() {
   const path = usePath()
-  const match = matchRoute(path)
+  const match = useMemo(() => matchRoute(path), [path])
+  const head = useMemo(() => headFor(match), [match])
   const [immersive, setImmersive] = useState(false)
+  useSeo(head)
 
   // Pindah rute saat lembar kerja sedang terbuka: muat ulang state dokumen.
   useEffect(() => {

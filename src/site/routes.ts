@@ -8,7 +8,11 @@ export type ToolSlug =
   | 'gabung-pdf'
   | 'pisah-pdf'
   | 'pdf-ke-jpg'
-  | 'jpg-ke-pdf'
+  | 'foto-ke-pdf'
+  | 'foto-ke-word'
+  | 'pdf-bisa-dicari'
+  | 'susun-pdf'
+  | 'sensor-pdf'
   | 'kompres-pdf'
   | 'putar-pdf'
   | 'watermark-pdf'
@@ -51,12 +55,38 @@ export const TOOLS: ToolMeta[] = [
     icon: 'image',
   },
   {
-    slug: 'jpg-ke-pdf',
-    name: 'JPG ke PDF',
+    slug: 'foto-ke-pdf',
+    name: 'Foto ke PDF',
     tagline: 'Susun foto atau scan menjadi satu PDF.',
     description:
       'Ubah beberapa foto JPG atau PNG menjadi satu berkas PDF yang rapi, dengan ukuran A4 atau mengikuti ukuran gambar.',
     icon: 'images',
+  },
+  {
+    slug: 'foto-ke-word',
+    name: 'Foto ke Word',
+    tagline: 'Susun beberapa foto menjadi satu Word yang bisa diedit.',
+    description:
+      'Atur urutan foto JPG, PNG, atau WebP, koreksi hasil bacaan tiap halaman, lalu unduh satu dokumen Word (.docx).',
+    icon: 'form',
+  },
+  {
+    slug: 'pdf-bisa-dicari', name: 'PDF Scan Bisa Dicari',
+    tagline: 'Buat teks pada PDF scan bisa dicari dan disalin.',
+    description: 'Tambahkan lapisan teks OCR Indonesia atau Inggris ke PDF hasil scan sambil mempertahankan tampilan halaman.',
+    icon: 'search',
+  },
+  {
+    slug: 'susun-pdf', name: 'Susun Halaman PDF',
+    tagline: 'Seret, putar, atau hapus halaman lewat pratinjau.',
+    description: 'Atur urutan halaman dengan pratinjau, putar halaman yang miring, hapus halaman yang tidak diperlukan, lalu unduh PDF.',
+    icon: 'layers',
+  },
+  {
+    slug: 'sensor-pdf', name: 'Sensor PDF',
+    tagline: 'Tutup data sensitif secara permanen sebelum dibagikan.',
+    description: 'Tandai area sensitif pada halaman PDF dan unduh salinan berisi halaman gambar yang sudah disensor.',
+    icon: 'redact',
   },
   {
     slug: 'kompres-pdf',
@@ -229,7 +259,7 @@ export function siteRoutes(): SiteRoute[] {
       path: '/alat',
       title: 'Alat PDF — gabung, pisah, kompres, dan lainnya',
       description:
-        'Kumpulan alat PDF gratis yang berjalan di browser: gabung, pisah, PDF ke JPG, JPG ke PDF, kompres, putar, watermark, dan isi formulir.',
+        'Gabung, pisah, dan kompres PDF, atau ubah foto dokumen menjadi Word. Semua alat berjalan langsung di browser.',
       priority: 0.9,
     },
     {
@@ -244,7 +274,7 @@ export function siteRoutes(): SiteRoute[] {
   for (const tool of TOOLS) {
     routes.push({
       path: `/alat/${tool.slug}`,
-      title: `${tool.name} — alat PDF gratis di browser`,
+      title: toolTitle(tool),
       description: tool.description,
       priority: 0.8,
     })
@@ -269,4 +299,10 @@ export function siteRoutes(): SiteRoute[] {
   }
 
   return routes
+}
+
+export function toolTitle(tool: ToolMeta) {
+  return tool.slug === 'foto-ke-word'
+    ? 'Foto ke Word (DOCX) — OCR gratis di browser'
+    : `${tool.name} — alat PDF gratis di browser`
 }

@@ -339,3 +339,27 @@ export function uniqueName(name: string, used: Set<string>) {
   used.add(candidate)
   return candidate
 }
+
+export type PageArrangement = { index: number; rotation: number }
+
+export async function organizePdf(bytes: Uint8Array, arrangement: PageArrangement[]) {
+  const source = await PDFDocument.load(bytes, { updateMetadata: false })
+  const original = source.getPages()
+  if (!arrangement.length || new Set(arrangement.map(({ index }) => index)).size !== arrangement.length ||
+    arrangement.some(({ index }) => !original[index])) throw new Error('Susunan halaman PDF tidak valid.')
+
+  // Bila semua halaman dipertahankan, gunakan referensi halaman asli agar formulir dan tautan internal ikut.
+  const keepAll = arrangement.length === original.length
+  const output = keepAll ? source : await PDFDocument.create()
+  const pages = keepAll
+    ? arrangement.map(({ index }) => original[index])
+    : await output.copyPages(source, arrangement.map(({ index }) => index))
+  if (keepAll) {
+    for (let index = original.length - 1; index >= 0; index--) output.removePage(index)
+  }
+  for (const [index, page] of pages.entries()) {
+    page.setRotation(degrees(normalizeRotation(page.getRotation().angle + arrangement[index].rotation)))
+    output.addPage(page)
+  }
+  return finish(output)
+}

@@ -29,6 +29,11 @@ export async function loadPdf(
       })
     }
   }
-  const doc = await task.promise
-  return { doc, destroy: () => task.destroy() }
+  try {
+    const doc = await task.promise
+    return { doc, destroy: () => task.destroy() }
+  } catch (error) {
+    await task.destroy()
+    throw error
+  }
 }

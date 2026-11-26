@@ -24,6 +24,10 @@ const PDF_A = path.join(WORK, 'satu.pdf')
 const PDF_B = path.join(WORK, 'dua.pdf')
 const FORM = path.join(WORK, 'form.pdf')
 const IMG = path.join(WORK, 'tanda.png')
+const PHOTO = path.join(WORK, 'surat.png')
+const PHOTO_TWO = path.join(WORK, 'lampiran.png')
+const SCAN = path.join(WORK, 'scan.pdf')
+const PRIVATE_PDF = path.join(WORK, 'pribadi.pdf')
 
 const failures = []
 let checks = 0
@@ -58,6 +62,14 @@ async function makeFixtures() {
   const agree = formFields.createCheckBox('setuju')
   agree.addToPage(formPage, { x: 40, y: 650, width: 18, height: 18 })
   fs.writeFileSync(FORM, await form.save())
+
+  const privateDoc = await PDFDocument.create()
+  const privatePage = privateDoc.addPage([595, 842])
+  privatePage.drawText('PRIVATE SECRET 13245', { x: 45, y: 765, size: 23 })
+  privatePage.drawText('KEEP VISIBLE', { x: 45, y: 675, size: 23 })
+  privateDoc.setTitle('PRIVATE METADATA')
+  await privateDoc.attach(new Uint8Array([1, 2, 3]), 'secret.txt')
+  fs.writeFileSync(PRIVATE_PDF, await privateDoc.save())
 
   // PNG tanda tangan sederhana
   fs.writeFileSync(
@@ -221,6 +233,7 @@ try {
     const info = spawnSync('pdfinfo', [file], { encoding: 'utf8' })
     return info.status === 0 ? Number(/Pages:\s+(\d+)/.exec(info.stdout)?.[1]) : null
   }
+  const textIn = (file) => spawnSync('pdftotext', [file, '-'], { encoding: 'utf8' }).stdout ?? ''
 
   console.log('\nGabung PDF')
   await go('/alat/gabung-pdf/')
@@ -262,13 +275,260 @@ try {
   if (files[0]) check(pageCount(files[0]) === 2, 'jumlah halaman tetap')
   cleanDownloads()
 
-  console.log('\nJPG ke PDF')
-  await go('/alat/jpg-ke-pdf/')
+  console.log('\nFoto ke PDF')
+  await go('/alat/foto-ke-pdf/')
   await upload([IMG])
   await clickText('Buat PDF')
   files = await waitDownload('.pdf')
   check(files.length === 1, 'PDF dari gambar terunduh')
   if (files[0]) check(pageCount(files[0]) === 1, 'satu halaman')
+  cleanDownloads()
+
+  console.log('\nFoto ke Word')
+  await go('/alat/foto-ke-word/')
+  const photoData = await evaluate(`(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1400
+    canvas.height = 990
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.translate(0, canvas.height)
+    ctx.rotate(-Math.PI / 2)
+    ctx.fillStyle = '#111'
+    ctx.font = 'bold 44px Arial'
+    ctx.textAlign = 'center'
+    ctx.fillText('SURAT KETERANGAN', 495, 135)
+    ctx.fillRect(100, 170, 785, 3)
+    ctx.fillStyle = '#a13548'
+    ctx.beginPath()
+    ctx.ellipse(145, 118, 30, 31, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = '#111'
+    ctx.font = '30px Arial'
+    ctx.textAlign = 'left'
+    ctx.fillText('Dokumen ini menerangkan bahwa', 100, 250)
+    ctx.fillText('Budi Santoso hadir pada hari Senin.', 100, 295)
+    ctx.fillText('Nama', 130, 385)
+    ctx.fillText(': Budi Santoso', 435, 385)
+    ctx.strokeStyle = '#234ba0'
+    ctx.lineWidth = 12
+    ctx.beginPath()
+    ctx.ellipse(635, 955, 45, 47, 0, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.strokeStyle = '#222'
+    ctx.lineWidth = 4
+    ctx.beginPath()
+    ctx.moveTo(616, 959)
+    ctx.bezierCurveTo(664, 916, 639, 984, 745, 955)
+    ctx.stroke()
+    return canvas.toDataURL('image/png').split(',')[1]
+  })()`)
+  fs.writeFileSync(PHOTO, Buffer.from(photoData, 'base64'))
+  await upload([PHOTO])
+  await evaluate(`document.querySelector('[aria-label="Putar foto 90 derajat"]').click()`)
+  await clickText('Baca teks dari foto')
+  await sleep(100)
+  await clickText('Batalkan pembacaan')
+  await sleep(200)
+  check(await evaluate(`[...document.querySelectorAll('button')].some((b) => !b.disabled && b.textContent.includes('Baca teks dari foto'))`),
+    'pembacaan foto bisa dibatalkan dan diulang')
+  await clickText('Baca teks dari foto')
+  let photoText = ''
+  for (let i = 0; i < 80; i++) {
+    photoText = await evaluate(`document.querySelector('#photo-word-text')?.value ?? ''`)
+    if (photoText || await evaluate(`document.querySelector('[role="status"].text-loss') !== null`)) break
+    await sleep(250)
+  }
+  check(photoText.includes('SURAT KETERANGAN') && photoText.includes('Budi Santoso'),
+    'OCR membaca isi foto setelah diputar', photoText || await evaluate('document.body.innerText'))
+  if (photoText) {
+    await evaluate(`(() => {
+      const editor = document.querySelector('#photo-word-text')
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+      setter.call(editor, editor.value.replace('Budi Santoso', 'Dewi Sari & Rekan'))
+      editor.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    await clickText('Unduh Word')
+    files = await waitDownload('.docx')
+    check(files.length === 1 && path.basename(files[0]) === 'surat.docx', 'hasil terunduh dengan nama surat.docx')
+    if (files[0]) {
+      const { stdout: xml } = spawnSync('unzip', ['-p', files[0], 'word/document.xml'], { encoding: 'utf8' })
+      check(isValidZip(files[0]), 'paket DOCX bisa dibaca')
+      check(xml.includes('<w:t xml:space="preserve">Dewi Sari &amp; Rekan hadir'), 'koreksi tersimpan sebagai teks Word')
+      check(xml.includes('<w:jc w:val="center"') && xml.includes('<w:ind w:left='), 'rata tengah dan inden tersimpan')
+      check(xml.includes('<w:pBdr>') && xml.includes('<w:tabs>'), 'garis kop dan tab formulir tersimpan')
+      check(xml.includes('Logo kop surat') && xml.includes('Tanda tangan dan stempel'),
+        'logo, tanda tangan, dan stempel dipertahankan sebagai gambar di DOCX editable')
+    }
+    cleanDownloads()
+    await clickText('Pilih area gambar')
+    await sleep(400)
+    const area = await evaluate(`(() => {
+      const canvas = document.querySelector('[role="dialog"] canvas')
+      const { x, y, width, height } = canvas.getBoundingClientRect()
+      return { x, y, width, height }
+    })()`)
+    const start = { x: area.x + area.width * 0.42, y: area.y + area.height * 0.59 }
+    const end = { x: area.x + area.width * 0.51, y: area.y + area.height * 0.64 }
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...start, button: 'left', buttons: 1, clickCount: 1 })
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...end, button: 'left', buttons: 1 })
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...end, button: 'left', clickCount: 1 })
+    await clickText('Pertahankan area ini')
+    await clickText('Unduh Word')
+    files = await waitDownload('.docx')
+    if (files[0]) {
+      const { stdout: xml } = spawnSync('unzip', ['-p', files[0], 'word/document.xml'], { encoding: 'utf8' })
+      check(xml.includes('Bagian grafis dokumen') && xml.includes('Dewi Sari &amp; Rekan'),
+        'area pilihan manual dan koreksi teks ikut tersimpan')
+    } else check(false, 'DOCX dengan area pilihan manual terunduh')
+  }
+  cleanDownloads()
+  await evaluate(`(() => {
+    const mode = [...document.querySelectorAll('select')].find((select) => select.options[1]?.value === 'photo')
+    mode.value = 'photo'
+    mode.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await clickText('Unduh salinan foto')
+  files = await waitDownload('.docx')
+  check(files.length === 1 && path.basename(files[0]) === 'surat-salinan-foto.docx', 'salinan foto terunduh')
+  if (files[0]) {
+    const { stdout: xml } = spawnSync('unzip', ['-p', files[0], 'word/document.xml'], { encoding: 'utf8' })
+    check(isValidZip(files[0]) && xml.includes('<w:drawing>'), 'salinan DOCX menyimpan foto sebagai gambar')
+  }
+  cleanDownloads()
+
+  console.log('\nBanyak Foto ke Word')
+  const photoTwo = await evaluate(`(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 850
+    canvas.height = 1150
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = '#111'
+    ctx.font = '36px Arial'
+    ctx.fillText('LAMPIRAN DIGITAL', 105, 145)
+    ctx.font = '26px Arial'
+    ctx.fillText('Kode lampiran 34825.', 105, 225)
+    return canvas.toDataURL('image/png').split(',')[1]
+  })()`)
+  fs.writeFileSync(PHOTO_TWO, Buffer.from(photoTwo, 'base64'))
+  await go('/alat/foto-ke-word/')
+  await upload([PHOTO, PHOTO_TWO])
+  await evaluate(`document.querySelector('[aria-label="Putar foto 90 derajat"]').click()`)
+  await evaluate(`document.querySelector('[aria-label="Naikkan lampiran.png"]').click()`)
+  await clickText('Baca semua foto yang tersisa')
+  let bothReady = false
+  for (let i = 0; i < 120 && !bothReady; i++) {
+    bothReady = await evaluate(`[...document.querySelectorAll('button')].some(b => !b.disabled && b.textContent.includes('Unduh Word (.docx)'))`)
+    if (!bothReady) await sleep(250)
+  }
+  check(bothReady, 'dua foto selesai dibaca dalam satu pekerjaan')
+  if (bothReady) {
+    await clickText('Unduh Word')
+    files = await waitDownload('.docx')
+    check(files.length === 1 && path.basename(files[0]) === 'lampiran.docx', 'satu DOCX terunduh mengikuti pilihan urutan')
+    if (files[0]) {
+      const { stdout: xml } = spawnSync('unzip', ['-p', files[0], 'word/document.xml'], { encoding: 'utf8' })
+      check((xml.match(/<w:sectPr>/g) ?? []).length === 2 && xml.includes('LAMPIRAN DIGITAL') &&
+        xml.includes('SURAT KETERANGAN') && xml.indexOf('LAMPIRAN DIGITAL') < xml.indexOf('SURAT KETERANGAN'),
+      'Word memuat dua bagian editable dalam urutan baru')
+      if (process.env.E2E_KEEP) fs.copyFileSync(files[0], path.join(WORK, 'hasil-multifoto.docx'))
+    }
+  }
+  cleanDownloads()
+
+  console.log('\nPDF Scan Bisa Dicari')
+  const scan = await PDFDocument.create()
+  const scanImage = await scan.embedPng(fs.readFileSync(PHOTO))
+  const scanPage = scan.addPage([700, 495])
+  scanPage.drawImage(scanImage, { width: 700, height: 495 })
+  scanPage.setRotation(degrees(90))
+  scan.addPage().drawText('NATIVE TEXT PRESENT')
+  fs.writeFileSync(SCAN, await scan.save())
+  await go('/alat/pdf-bisa-dicari/')
+  await upload([SCAN])
+  await clickText('Buat PDF yang bisa dicari')
+  files = await waitDownload('.pdf', 40000)
+  check(files.length === 1, 'PDF scan OCR terunduh')
+  if (files[0]) {
+    const extracted = textIn(files[0])
+    check(extracted.includes('SURAT KETERANGAN') && extracted.includes('NATIVE TEXT PRESENT'),
+      'teks halaman scan yang diputar dan halaman teks asli dapat diekstrak')
+    const doc = await PDFDocument.load(fs.readFileSync(files[0]))
+    check(doc.getPageCount() === 2 && doc.getPage(0).getRotation().angle === 90, 'jumlah dan orientasi halaman scan tetap')
+    if (process.env.E2E_KEEP) fs.copyFileSync(files[0], path.join(WORK, 'hasil-searchable.pdf'))
+  }
+  cleanDownloads()
+
+  console.log('\nSusun Halaman PDF')
+  await go('/alat/susun-pdf/')
+  await upload([PDF_A])
+  await evaluate(`(() => {
+    window.testDrag = new DataTransfer()
+    document.querySelector('[data-page="1"]').dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: window.testDrag }))
+  })()`)
+  await evaluate(`document.querySelector('[data-page="2"]').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: window.testDrag }))`)
+  check(await evaluate(`document.querySelector('[data-page]')?.dataset.page === '2'`), 'kartu halaman bisa diseret untuk menyusun urutan')
+  await clickText('Atur ulang')
+  await evaluate(`document.querySelector('[aria-label="Majukan halaman 2"]').click()`)
+  await evaluate(`document.querySelector('[aria-label="Putar halaman 2"]').click()`)
+  await clickText('Unduh PDF tersusun')
+  files = await waitDownload('.pdf')
+  check(files.length === 1, 'susunan halaman PDF terunduh')
+  if (files[0]) {
+    const arranged = await PDFDocument.load(fs.readFileSync(files[0]))
+    const extracted = textIn(files[0])
+    check(arranged.getPage(0).getRotation().angle === 90 && extracted.includes('halaman 2') &&
+      extracted.indexOf('halaman 2') < extracted.indexOf('halaman 1'), 'urutan dan rotasi diterapkan')
+  }
+  cleanDownloads()
+  await evaluate(`document.querySelector('[aria-label="Hapus halaman 1"]').click()`)
+  await clickText('Unduh PDF tersusun')
+  files = await waitDownload('.pdf')
+  check(files.length === 1 && pageCount(files[0]) === 1 && !textIn(files[0]).includes('halaman 1'), 'halaman yang dihapus tidak ikut diekspor')
+  cleanDownloads()
+
+  console.log('\nSensor PDF')
+  await send('Emulation.setDeviceMetricsOverride', { width: 412, height: 820, deviceScaleFactor: 1, mobile: true })
+  await send('Emulation.setTouchEmulationEnabled', { enabled: true })
+  await go('/alat/sensor-pdf/')
+  await upload([PRIVATE_PDF])
+  const redactArea = await evaluate(`(() => {
+    const canvas = document.querySelector('canvas[data-ready=true]')
+    if (!canvas) return null
+    canvas.scrollIntoView({ block: 'center', behavior: 'instant' })
+    const { x, y, width, height } = canvas.getBoundingClientRect()
+    return { x, y, width, height }
+  })()`)
+  check(!!redactArea, 'pratinjau PDF untuk sensor tampil')
+  if (redactArea) {
+    const start = { x: redactArea.x + redactArea.width * 0.06, y: redactArea.y + redactArea.height * 0.06 }
+    const end = { x: redactArea.x + redactArea.width * 0.67, y: redactArea.y + redactArea.height * 0.105 }
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] })
+    await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [end] })
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await clickText('Unduh PDF disensor')
+    files = await waitDownload('.pdf')
+    check(files.length === 1 && pageCount(files[0]) === 1, 'PDF disensor terunduh')
+    if (files[0]) {
+      const redacted = await PDFDocument.load(fs.readFileSync(files[0]))
+      check(!textIn(files[0]).trim() && !redacted.getTitle() && !redacted.catalog.get(require('pdf-lib').PDFName.of('Names')),
+        'teks, judul internal, dan lampiran dari PDF sumber tidak ikut')
+      const raster = spawnSync('pdftoppm', ['-singlefile', '-scale-to', '400', files[0]], { maxBuffer: 2_000_000 }).stdout
+      const header = /^P6\s+(\d+)\s+(\d+)\s+255\n/.exec(raster.toString('latin1', 0, 80))
+      if (header) {
+        const [width, height] = header.slice(1).map(Number)
+        const pixel = (x, y) => raster[header[0].length + 3 * (Math.round(y * height) * width + Math.round(x * width))]
+        check(pixel(0.25, 0.085) === 0 && pixel(0.7, 0.085) > 240 && pixel(0.25, 0.125) > 240,
+          'kotak sensor menjadi piksel hitam dan area sekitar tetap terlihat')
+      } else check(false, 'hasil sensor bisa dirender')
+      if (process.env.E2E_KEEP) fs.copyFileSync(files[0], path.join(WORK, 'hasil-sensor.pdf'))
+    }
+  }
+  await send('Emulation.setTouchEmulationEnabled', { enabled: false })
+  await send('Emulation.clearDeviceMetricsOverride')
   cleanDownloads()
 
   console.log('\nPDF ke JPG')

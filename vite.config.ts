@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, type Plugin } from 'vite'
@@ -7,6 +8,37 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // BASE_PATH bisa diisi saat build untuk sub-path (mis. GitHub Pages).
 const base = process.env.BASE_PATH ?? '/'
+
+/** Worker Tesseract memilih model dan varian WebAssembly saat alat digunakan. */
+function ocrAssets(): Plugin {
+  const require = createRequire(import.meta.url)
+  const assets = new Map(['ind', 'eng'].map((code) => {
+    const name = `${code}.traineddata.gz`
+    return [`ocr/${name}`, require.resolve(`@tesseract.js-data/${code}/4.0.0_best_int/${name}`)]
+  }))
+  for (const variant of ['', '-simd', '-relaxedsimd']) {
+    const name = `tesseract-core${variant}-lstm.wasm.js`
+    assets.set(`ocr/core/${name}`, require.resolve(`tesseract.js-core/${name}`))
+  }
+
+  return {
+    name: 'ttd-ocr-assets',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url?.split('?')[0] ?? ''
+        const file = url.startsWith(base) ? assets.get(url.slice(base.length)) : undefined
+        if (!file) return next()
+        res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : 'application/gzip')
+        fs.createReadStream(file).pipe(res)
+      })
+    },
+    generateBundle() {
+      for (const [fileName, file] of assets) {
+        this.emitFile({ type: 'asset', fileName, source: fs.readFileSync(file) })
+      }
+    },
+  }
+}
 
 /**
  * Sajikan `<rute>/index.html` untuk permintaan di server preview, sama
@@ -44,6 +76,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    ocrAssets(),
     routeFallback(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -71,7 +104,11 @@ export default defineConfig({
       workbox: {
         // worker pdf.js (.mjs) ikut disimpan supaya bisa dipakai offline
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,mjs,webmanifest}'],
-        globIgnores: ['**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2'],
+        globIgnores: [
+          '**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2',
+          '**/ocr/core/**',
+          '**/worker.min-*.js',
+        ],
         // Tiap rute punya HTML hasil prerender sendiri, jadi tidak ada fallback
         // ke beranda: fallback justru menukar HTML rute lain dan memicu
         // hydration mismatch di React.

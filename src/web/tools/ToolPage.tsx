@@ -19,10 +19,30 @@ const STEPS: Record<string, string[]> = {
     'Tentukan format gambar dan resolusinya.',
     'Unduh semua gambar yang dihasilkan.',
   ],
-  'jpg-ke-pdf': [
+  'foto-ke-pdf': [
     'Pilih beberapa gambar JPG atau PNG.',
     'Atur urutan dan ukuran halaman.',
     'Tekan “Buat PDF” lalu unduh hasilnya.',
+  ],
+  'foto-ke-word': [
+    'Pilih foto dokumen, lalu atur urutan dan arahnya.',
+    'Baca teks otomatis, lalu koreksi sambil melihat foto.',
+    'Unduh semua halaman sebagai satu dokumen Word.',
+  ],
+  'pdf-bisa-dicari': [
+    'Pilih PDF hasil scan.',
+    'Pilih bahasa teks pada halaman.',
+    'Unduh PDF dan cari kata di dalamnya.',
+  ],
+  'susun-pdf': [
+    'Buka PDF untuk melihat pratinjau halaman.',
+    'Seret, putar, atau hapus halaman.',
+    'Unduh PDF dengan susunan baru.',
+  ],
+  'sensor-pdf': [
+    'Buka PDF dan pilih halaman.',
+    'Tarik kotak untuk menutup bagian sensitif.',
+    'Unduh salinan PDF yang sudah disensor.',
   ],
   'kompres-pdf': [
     'Pilih PDF yang ukurannya terlalu besar.',
@@ -57,7 +77,7 @@ export function ToolIntro({ tool }: { tool: ToolMeta }) {
 
   return (
     <div className="mx-auto w-full max-w-4xl px-5 pt-10">
-      <p className={eyebrow}>Alat PDF</p>
+      <p className={eyebrow}>{tool.slug === 'foto-ke-word' ? 'Konversi dokumen' : 'Alat PDF'}</p>
       <h1 className="mt-2 font-serif text-3xl leading-tight tracking-tight sm:text-4xl">
         {tool.name}
       </h1>
